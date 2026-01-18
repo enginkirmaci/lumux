@@ -1,14 +1,14 @@
-"""Setup configuration for Philips Hue Sync."""
+"""Setup configuration for Lumux."""
 
 from setuptools import setup, find_packages
 from pathlib import Path
 
 
 setup(
-    name="philips-hue-sync-glm",
+    name="lumux",
     version="0.1.0",
-    description="Philips Hue ambient lighting sync for Wayland",
-    author="Hue Sync Team",
+    description="Lumux ambient lighting sync for Wayland",
+    author="Lumux Team",
     license="MIT",
     packages=find_packages(),
     install_requires=[
@@ -19,12 +19,12 @@ setup(
     ],
     entry_points={
         'console_scripts': [
-            'hue-sync=main:main',
+            'lumux=main:main',
         ],
     },
     data_files=[
-        ('share/hue-sync/data', ['data/default_settings.json']),
-        ('share/hue-sync/data', ['data/default_zones.json']),
+        ('share/lumux/data', ['data/default_settings.json']),
+        ('share/lumux/data', ['data/default_zones.json']),
     ],
     python_requires='>=3.10',
     classifiers=[

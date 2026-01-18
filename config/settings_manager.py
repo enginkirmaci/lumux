@@ -54,7 +54,7 @@ class SettingsManager:
 
     def _init(self):
         self._settings = Settings()
-        self._config_dir = Path.home() / '.config' / 'hue-sync'
+        self._config_dir = Path.home() / '.config' / 'lumux'
         self._settings_file = self._config_dir / 'settings.json'
         self._load_settings()
 

@@ -4,11 +4,11 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, GLib
 
-from hue_sync.bridge import HueBridge
-from hue_sync.capture import ScreenCapture
-from hue_sync.zones import ZoneProcessor
-from hue_sync.colors import ColorAnalyzer
-from hue_sync.sync import SyncController
+from lumux.bridge import HueBridge
+from lumux.capture import ScreenCapture
+from lumux.zones import ZoneProcessor
+from lumux.colors import ColorAnalyzer
+from lumux.sync import SyncController
 from config.settings_manager import SettingsManager
 from config.zone_mapping import ZoneMapping
 from gui.settings_dialog import SettingsDialog
@@ -16,7 +16,7 @@ from gui.zone_preview_widget import ZonePreviewWidget
 
 
 class MainWindow(Gtk.ApplicationWindow):
-    __gtype_name__ = 'HueSyncMainWindow'
+    __gtype_name__ = 'LumuxMainWindow'
 
     def __init__(self, app, sync_controller: SyncController):
         super().__init__(application=app)

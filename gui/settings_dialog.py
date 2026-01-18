@@ -5,7 +5,7 @@ gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk
 
 from config.settings_manager import SettingsManager
-from hue_sync.bridge import HueBridge
+from lumux.bridge import HueBridge
 
 
 class SettingsDialog(Gtk.Dialog):

@@ -33,7 +33,7 @@ class HueBridge:
             print(f"Error connecting to bridge: {e}")
             return False
 
-    def create_user(self, bridge_ip: str, application_name: str = "hue-sync") -> Optional[str]:
+    def create_user(self, bridge_ip: str, application_name: str = "lumux") -> Optional[str]:
         """Create a new user/app key on the bridge.
 
         User must press the link button on the bridge before calling this.

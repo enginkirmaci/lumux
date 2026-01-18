@@ -5,10 +5,10 @@ import threading
 import time
 from typing import Dict, Tuple, Optional
 
-from hue_sync.bridge import HueBridge
-from hue_sync.capture import ScreenCapture
-from hue_sync.zones import ZoneProcessor
-from hue_sync.colors import ColorAnalyzer
+from lumux.bridge import HueBridge
+from lumux.capture import ScreenCapture
+from lumux.zones import ZoneProcessor
+from lumux.colors import ColorAnalyzer
 from config.zone_mapping import ZoneMapping
 from typing import Optional
 

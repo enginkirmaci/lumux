@@ -43,7 +43,7 @@ pip install -e .
 
 ```bash
 git clone <repository-url>
-cd philips-hue-sync-glm
+cd lumux
 pip install -r requirements.txt
 python main.py
 ```
@@ -52,7 +52,7 @@ python main.py
 
 ```bash
 pip install -e .
-hue-sync
+lumux
 ```
 
 ## Usage
@@ -65,7 +65,7 @@ hue-sync
    ```
    or
    ```bash
-   hue-sync
+   lumux
    ```
 
 2. Click **Settings** button
@@ -93,9 +93,9 @@ hue-sync
 
 ### Configuration
 
-Settings are automatically saved to `~/.config/hue-sync/settings.json`
+Settings are automatically saved to `~/.config/lumux/settings.json`
 
-Zone mappings are saved to `~/.config/hue-sync/zones.json`
+Zone mappings are saved to `~/.config/lumux/zones.json`
 
 ## Zone Layouts
 
@@ -145,7 +145,7 @@ If screen capture doesn't work on Wayland:
 ### Project Structure
 
 ```
-philips-hue-sync-glm/
+lumux/
 ├── main.py                 # Application entry point
 ├── hue_sync/               # Core sync modules
 │   ├── bridge.py           # Hue bridge connection

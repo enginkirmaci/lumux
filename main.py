@@ -1,24 +1,24 @@
-"""Main application entry point for Philips Hue Sync."""
+"""Main application entry point for Lumux."""
 
 import gi
 gi.require_version("Gtk", "4.0")
 
 from gi.repository import Gtk, GLib
 
-from hue_sync.bridge import HueBridge
-from hue_sync.capture import ScreenCapture
-from hue_sync.zones import ZoneProcessor
-from hue_sync.colors import ColorAnalyzer
-from hue_sync.sync import SyncController
+from lumux.bridge import HueBridge
+from lumux.capture import ScreenCapture
+from lumux.zones import ZoneProcessor
+from lumux.colors import ColorAnalyzer
+from lumux.sync import SyncController
 from config.settings_manager import SettingsManager
 from config.zone_mapping import ZoneMapping
 from gui.main_window import MainWindow
-from hue_sync.light_updater import LightUpdateWorker
+from lumux.light_updater import LightUpdateWorker
 
 
-class HueSyncApp(Gtk.Application):
+class LumuxApp(Gtk.Application):
     def __init__(self):
-        super().__init__(application_id='com.github.huesync')
+        super().__init__(application_id='com.github.lumux')
         self.connect('activate', self.on_activate)
 
     def on_activate(self, app):
@@ -81,7 +81,7 @@ class HueSyncApp(Gtk.Application):
 
 
 def main():
-    app = HueSyncApp()
+    app = LumuxApp()
     app.run(None)
 
 

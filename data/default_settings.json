@@ -1,0 +1,23 @@
+{
+  "hue": {
+    "bridge_ip": "",
+    "app_key": "",
+    "auto_discover": true
+  },
+  "capture": {
+    "scale_factor": 0.125,
+    "display_index": 0,
+    "rotation": 0
+  },
+  "zones": {
+    "layout": "ambilight",
+    "grid_rows": 16,
+    "grid_cols": 16
+  },
+  "sync": {
+    "fps": 30,
+    "transition_time_ms": 50,
+    "brightness_scale": 1.0,
+    "smoothing_factor": 0.3
+  }
+}

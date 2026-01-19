@@ -304,7 +304,7 @@ class SyncController:
                         })
                     
                     # Use average brightness for the overall light level
-                    avg_brightness = sum(u[1][1] for u in updates) / len(updates)
+                    avg_brightness = max(u[1][1] for u in updates)
                     
                     if self._stats['frame_count'] % 100 == 0:
                         print(f"Sending gradient update for '{info.get('name')}' ({points_count} points, from {len(sorted_updates)} zones)")

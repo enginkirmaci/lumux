@@ -95,8 +95,8 @@ class ZoneProcessor:
 
             top_count = self.cols
             bottom_count = self.cols
-            left_count = max(1, self.rows // 2)
-            right_count = max(1, self.rows // 2)
+            left_count = self.rows
+            right_count = self.rows
 
             top_zone_width = width // top_count
             bottom_zone_width = width // bottom_count
@@ -143,8 +143,8 @@ class ZoneProcessor:
         if self.layout == "ambilight":
             top_count = self.cols
             bottom_count = self.cols
-            left_count = max(1, self.rows // 2)
-            right_count = max(1, self.rows // 2)
+            left_count = self.rows
+            right_count = self.rows
             return top_count + bottom_count + left_count + right_count
         else:
             return self.rows * self.cols
@@ -154,8 +154,8 @@ class ZoneProcessor:
         if self.layout == "ambilight":
             top_count = self.cols
             bottom_count = self.cols
-            left_count = max(1, self.rows // 2)
-            right_count = max(1, self.rows // 2)
+            left_count = self.rows
+            right_count = self.rows
             
             zones = []
             for i in range(top_count):

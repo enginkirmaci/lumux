@@ -44,9 +44,9 @@ class ZonePreviewWidget(Gtk.DrawingArea):
                 zones.append(f"top_{i}")
             for i in range(self.cols):
                 zones.append(f"bottom_{i}")
-            for i in range(max(1, self.rows // 2)):
+            for i in range(self.rows):
                 zones.append(f"left_{i}")
-            for i in range(max(1, self.rows // 2)):
+            for i in range(self.rows):
                 zones.append(f"right_{i}")
             return zones
         else:
@@ -97,8 +97,8 @@ class ZonePreviewWidget(Gtk.DrawingArea):
         
         top_count = self.cols
         bottom_count = self.cols
-        left_count = max(1, self.rows // 2)
-        right_count = max(1, self.rows // 2)
+        left_count = self.rows
+        right_count = self.rows
 
         top_zone_width = width / top_count
         bottom_zone_width = width / bottom_count

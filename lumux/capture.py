@@ -252,40 +252,6 @@ class ScreenCapture:
             self._portal_session_handle = None
             print("GStreamer pipeline stopped")
 
-    def _get_monitor(self):
-        """Get current monitor."""
-        if not self._display:
-            return None
-        
-        try:
-            monitors = self._display.get_monitors()
-            return monitors.get_item(self.display_index)
-        except Exception:
-            return None
-
-    def get_display_count(self) -> int:
-        """Get number of available displays."""
-        if not self._display:
-            return 1
-
-        try:
-            monitors = self._display.get_monitors()
-            return monitors.get_n_items()
-        except Exception:
-            return 1
-
-    def get_display_size(self) -> tuple:
-        """Get size of current display.
-
-        Returns:
-            Tuple of (width, height)
-        """
-        monitor = self._get_monitor()
-        if monitor:
-            geometry = monitor.get_geometry()
-            return (geometry.width, geometry.height)
-        return (1920, 1080)
-
     def __del__(self):
         """Cleanup on destruction."""
         self.stop_pipeline()

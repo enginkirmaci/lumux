@@ -4,12 +4,11 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk
 
-from config.settings_manager import SettingsManager
-from lumux.bridge import HueBridge
+from lumux.app_context import AppContext
 
 
 class SettingsDialog(Gtk.Dialog):
-    def __init__(self, parent, bridge: HueBridge):
+    def __init__(self, parent, app_context: AppContext):
         super().__init__(
             title="Settings",
             transient_for=parent,
@@ -17,8 +16,9 @@ class SettingsDialog(Gtk.Dialog):
             default_width=500,
             default_height=400
         )
-        self.settings = SettingsManager.get_instance()
-        self.bridge = bridge
+        self.app_context = app_context
+        self.settings = app_context.settings
+        self.bridge = app_context.bridge
         self.discovered_bridges = []
 
         self._build_ui()
@@ -345,9 +345,10 @@ class SettingsDialog(Gtk.Dialog):
 
     def _update_bridge_status(self):
         """Update bridge connection status display."""
-        if self.bridge.test_connection():
+        status = self.app_context.get_bridge_status(attempt_connect=True)
+        if status.connected:
             self.bridge_status_label.set_text("Connected")
-            self.lights_label.set_text(f"Lights: {len(self.bridge.get_light_ids())}")
+            self.lights_label.set_text(f"Lights: {status.light_count}")
             self.zones_label.set_text(f"Zones: {len(self.bridge.get_zone_ids())}")
         else:
             self.bridge_status_label.set_text("Not connected")

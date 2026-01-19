@@ -4,13 +4,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, GLib
 
-from lumux.bridge import HueBridge
-from lumux.capture import ScreenCapture
-from lumux.zones import ZoneProcessor
-from lumux.colors import ColorAnalyzer
-from lumux.sync import SyncController
-from config.settings_manager import SettingsManager
-from config.zone_mapping import ZoneMapping
+from lumux.app_context import AppContext
 from gui.settings_dialog import SettingsDialog
 from gui.zone_preview_widget import ZonePreviewWidget
 
@@ -18,10 +12,11 @@ from gui.zone_preview_widget import ZonePreviewWidget
 class MainWindow(Gtk.ApplicationWindow):
     __gtype_name__ = 'LumuxMainWindow'
 
-    def __init__(self, app, sync_controller: SyncController):
+    def __init__(self, app, app_context: AppContext):
         super().__init__(application=app)
-        self.sync_controller = sync_controller
-        self.settings = SettingsManager.get_instance()
+        self.app_context = app_context
+        self.sync_controller = app_context.sync_controller
+        self.settings = app_context.settings
         self.bridge_connected = False
 
         self._build_ui()
@@ -31,7 +26,7 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def _build_ui(self):
         """Build main window layout."""
-        self.set_title("Philips Hue Sync")
+        self.set_title("Lumux for Philips Hue Sync")
         self.set_default_size(900, 700)
 
         header = Gtk.HeaderBar()
@@ -114,32 +109,34 @@ class MainWindow(Gtk.ApplicationWindow):
         btn_box.append(self.stop_btn)
         control_box.append(btn_box)
 
-        info_label = Gtk.Label(
+        self.info_label = Gtk.Label(
             label="Configure your Hue bridge in Settings before starting sync."
         )
-        info_label.set_wrap(True)
-        info_label.set_halign(Gtk.Align.CENTER)
-        control_box.append(info_label)
+        self.info_label.set_wrap(True)
+        self.info_label.set_halign(Gtk.Align.CENTER)
+        control_box.append(self.info_label)
 
         main_box.append(control_frame)
 
     def _check_bridge_connection(self):
         """Check if bridge is connected and update UI accordingly."""
-        self.bridge_connected = self.sync_controller.bridge.test_connection()
+        status = self.app_context.get_bridge_status(attempt_connect=True)
+        self.bridge_connected = status.connected
         
         if self.bridge_connected:
-            num_lights = len(self.sync_controller.bridge.get_light_ids())
-            if num_lights > 0:
-                self.status_label.set_text(f"Connected - {num_lights} light(s) found")
+            if status.light_count > 0:
+                self.status_label.set_text(f"Connected - {status.light_count} light(s) found")
             else:
                 self.status_label.set_text("Connected - No lights found")
             self.start_btn.set_sensitive(True)
+            self.info_label.set_visible(False)
         else:
-            if not self.settings.hue.bridge_ip or not self.settings.hue.app_key:
+            if not status.configured:
                 self.status_label.set_text("Not configured - Open Settings to configure bridge")
             else:
-                self.status_label.set_text(f"Not connected to bridge at {self.settings.hue.bridge_ip}")
+                self.status_label.set_text(f"Not connected to bridge at {status.bridge_ip}")
             self.start_btn.set_sensitive(False)
+            self.info_label.set_visible(True)
 
     def _update_status(self) -> bool:
         """Check for status updates from sync thread."""
@@ -198,12 +195,13 @@ class MainWindow(Gtk.ApplicationWindow):
 
     def _on_settings_clicked(self, button):
         """Open settings dialog."""
-        dialog = SettingsDialog(self, self.sync_controller.bridge)
+        dialog = SettingsDialog(self, self.app_context)
         dialog.connect("close-request", self._on_settings_closed)
         dialog.present()
     
     def _on_settings_closed(self, dialog):
         """Handle settings dialog close - refresh configuration."""
+        self.app_context.apply_settings()
         self._check_bridge_connection()
         
         # Refresh Zone Preview widget with new layout/grid size
@@ -212,16 +210,7 @@ class MainWindow(Gtk.ApplicationWindow):
             self.settings.zones.grid_rows,
             self.settings.zones.grid_cols
         )
-        
-        # Update components with new settings
-        self.sync_controller.capture.scale_factor = self.settings.capture.scale_factor
-        self.sync_controller.capture.display_index = self.settings.capture.display_index
-        self.sync_controller.capture.rotation = self.settings.capture.rotation
-        
-        self.sync_controller.zone_processor.layout = self.settings.zones.layout
-        self.sync_controller.zone_processor.rows = self.settings.zones.grid_rows
-        self.sync_controller.zone_processor.cols = self.settings.zones.grid_cols
-        
+
         return False
 
     def do_close_request(self) -> bool:

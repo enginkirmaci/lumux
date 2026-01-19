@@ -4,6 +4,7 @@ import json
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Optional, List
+from config.zone_mapping import ZoneMapping
 
 
 @dataclass
@@ -81,6 +82,21 @@ class SettingsManager:
     @property
     def sync(self) -> SyncSettings:
         return self._settings.sync
+
+    def get_zone_mapping(self) -> ZoneMapping:
+        """Return a ZoneMapping instance stored in the config directory.
+
+        Ensures a default mapping file exists by saving the default mapping
+        when the file is not present.
+        """
+        mapping_file = self._config_dir / 'zones.json'
+        zone_mapping = ZoneMapping(mapping_file=mapping_file)
+
+        # Save default mapping if file doesn't exist
+        if not mapping_file.exists():
+            zone_mapping.save(mapping_file)
+
+        return zone_mapping
 
     def _load_settings(self):
         """Load settings from config file."""

@@ -31,6 +31,7 @@ class SyncSettings:
     fps: int = 15
     transition_time_ms: int = 100
     brightness_scale: float = 1.0
+    gamma: float = 1.0
     smoothing_factor: float = 0.3
 
 
@@ -84,17 +85,10 @@ class SettingsManager:
     def get_zone_mapping(self) -> ZoneMapping:
         """Return a ZoneMapping instance stored in the config directory.
 
-        Ensures a default mapping file exists by saving the default mapping
-        when the file is not present.
+        Zone mappings are not persisted; mapping is regenerated on each sync start.
         """
-        mapping_file = self._config_dir / 'zones.json'
-        zone_mapping = ZoneMapping(mapping_file=mapping_file)
-
-        # Save default mapping if file doesn't exist
-        if not mapping_file.exists():
-            zone_mapping.save(mapping_file)
-
-        return zone_mapping
+        
+        return ZoneMapping()
 
     def _load_settings(self):
         """Load settings from config file."""
@@ -137,6 +131,7 @@ class SettingsManager:
         self._settings.sync.fps = max(1, min(60, self._settings.sync.fps))
         self._settings.sync.transition_time_ms = max(0, min(10000, self._settings.sync.transition_time_ms))
         self._settings.sync.brightness_scale = max(0.0, min(2.0, self._settings.sync.brightness_scale))
+        self._settings.sync.gamma = max(0.1, min(3.0, self._settings.sync.gamma))
         self._settings.sync.smoothing_factor = max(0.0, min(1.0, self._settings.sync.smoothing_factor))
 
         self._settings.zones.layout = self._settings.zones.layout.lower()

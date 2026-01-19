@@ -7,8 +7,9 @@ import numpy as np
 
 
 class ColorAnalyzer:
-    def __init__(self, brightness_scale: float = 1.0):
+    def __init__(self, brightness_scale: float = 1.0, gamma: float = 1.0):
         self.brightness_scale = brightness_scale
+        self.gamma = gamma
         self.previous_colors: Dict[str, Tuple[Tuple[float, float], int]] = {}
 
     def analyze_zone(self, rgb: Tuple[int, int, int], 
@@ -22,10 +23,11 @@ class ColorAnalyzer:
         Returns:
             Tuple of ((x, y), brightness)
         """
-        r, g, b = rgb
+        corrected_rgb = self._apply_gamma(rgb)
+        r, g, b = corrected_rgb
         xy = rgb_to_xy(r, g, b)
         
-        brightness = self._calculate_brightness(rgb)
+        brightness = self._calculate_brightness(corrected_rgb)
         
         return (xy, brightness)
 
@@ -38,6 +40,16 @@ class ColorAnalyzer:
         luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
         brightness = int((luminance / 255.0) * 254.0 * self.brightness_scale)
         return max(1, min(254, brightness))
+
+    def _apply_gamma(self, rgb: Tuple[int, int, int]) -> Tuple[int, int, int]:
+        """Apply gamma correction to RGB values."""
+        gamma = self.gamma if self.gamma > 0 else 1.0
+        corrected = []
+        for channel in rgb:
+            normalized = max(0.0, min(1.0, channel / 255.0))
+            adjusted = normalized ** gamma
+            corrected.append(int(round(adjusted * 255.0)))
+        return tuple(corrected)  # type: ignore[return-value]
 
     def apply_smoothing(self, current: Dict[str, Tuple[Tuple[float, float], int]],
                       factor: float = 0.3) -> Dict[str, Tuple[Tuple[float, float], int]]:

@@ -42,6 +42,8 @@ class SyncController:
         """Start sync thread."""
         if self.running:
             return
+
+        self.zone_mapping.mapping = {}
         
         # Check if existing mapping is valid
         available_lights = self.bridge.get_light_ids()
@@ -91,10 +93,6 @@ class SyncController:
                         self.zone_processor.cols
                     )
                 
-                if self.zone_mapping.mapping_file:
-                    self.zone_mapping.save(self.zone_mapping.mapping_file)
-                    print(f"Saved mapping to {self.zone_mapping.mapping_file}")
-
                 print(f"Active mapping for {len(available_lights)} lights:")
                 for lid in available_lights:
                     m_zones = [z for z, lits in self.zone_mapping.mapping.items() if lid in lits]

@@ -16,6 +16,7 @@
     "fps": 30,
     "transition_time_ms": 50,
     "brightness_scale": 1.0,
+    "gamma": 1.0,
     "smoothing_factor": 0.3
   }
 }

@@ -33,7 +33,8 @@ class AppContext:
             cols=settings.zones.grid_cols
         )
         self.color_analyzer = ColorAnalyzer(
-            brightness_scale=settings.sync.brightness_scale
+            brightness_scale=settings.sync.brightness_scale,
+            gamma=settings.sync.gamma
         )
         self.zone_mapping = settings.get_zone_mapping()
 
@@ -80,6 +81,7 @@ class AppContext:
         self.zone_mapping.layout = zones.layout
 
         self.color_analyzer.brightness_scale = self.settings.sync.brightness_scale
+        self.color_analyzer.gamma = self.settings.sync.gamma
 
     def get_bridge_status(self, attempt_connect: bool = False) -> BridgeStatus:
         """Return current bridge status, optionally attempting a connection."""

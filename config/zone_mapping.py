@@ -6,15 +6,11 @@ from typing import Dict, List, Optional
 
 
 class ZoneMapping:
-    def __init__(self, mapping_file: Optional[Path] = None):
+    def __init__(self):
         self.mapping: Dict[str, List[str]] = {}
         self.layout = "ambilight"
-        self.mapping_file = mapping_file
-        
-        if mapping_file and mapping_file.exists():
-            self.load(mapping_file)
-        else:
-            self._set_default_mapping()
+                
+        self._set_default_mapping()
 
     def _set_default_mapping(self):
         """Set default zone mappings for ambilight layout."""
@@ -31,30 +27,6 @@ class ZoneMapping:
             'right_0': [],
             'right_1': []
         }
-
-    def load(self, mapping_file: Path):
-        """Load zone mapping from JSON file."""
-        try:
-            with open(mapping_file, 'r') as f:
-                data = json.load(f)
-            
-            self.layout = data.get('layout', 'ambilight')
-            self.mapping = data.get('zones', {})
-        except (json.JSONDecodeError, IOError) as e:
-            print(f"Error loading zone mapping: {e}")
-            self._set_default_mapping()
-
-    def save(self, mapping_file: Path):
-        """Save zone mapping to JSON file."""
-        mapping_file.parent.mkdir(parents=True, exist_ok=True)
-        
-        data = {
-            'layout': self.layout,
-            'zones': self.mapping
-        }
-        
-        with open(mapping_file, 'w') as f:
-            json.dump(data, f, indent=2)
 
     def map_zone_to_lights(self, zone_id: str, light_ids: List[str]):
         """Assign lights to a zone."""

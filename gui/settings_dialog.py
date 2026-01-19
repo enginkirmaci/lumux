@@ -264,6 +264,20 @@ class SettingsDialog(Gtk.Dialog):
         brightness_box.append(self.brightness_spin)
         frame_box.append(brightness_box)
 
+        gamma_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        gamma_label = Gtk.Label(label="Gamma:")
+        gamma_label.set_size_request(150, -1)
+        gamma_label.set_xalign(0)
+        self.gamma_adj = Gtk.Adjustment(
+            value=self.settings.sync.gamma,
+            lower=0.1, upper=3.0, step_increment=0.1, page_increment=0.2
+        )
+        self.gamma_spin = Gtk.SpinButton(adjustment=self.gamma_adj)
+        self.gamma_spin.set_digits(2)
+        gamma_box.append(gamma_label)
+        gamma_box.append(self.gamma_spin)
+        frame_box.append(gamma_box)
+
         smoothing_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         smoothing_label = Gtk.Label(label="Smoothing Factor:")
         smoothing_label.set_size_request(150, -1)
@@ -339,6 +353,7 @@ class SettingsDialog(Gtk.Dialog):
             self.settings.sync.fps = int(self.sync_fps_adj.get_value())
             self.settings.sync.transition_time_ms = int(self.transition_adj.get_value())
             self.settings.sync.brightness_scale = self.brightness_adj.get_value()
+            self.settings.sync.gamma = self.gamma_adj.get_value()
             self.settings.sync.smoothing_factor = self.smoothing_adj.get_value()
             self.settings.save()
 

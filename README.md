@@ -95,8 +95,6 @@ lumux
 
 Settings are automatically saved to `~/.config/lumux/settings.json`
 
-Zone mappings are saved to `~/.config/lumux/zones.json`
-
 ## Zone Layouts
 
 ### Ambilight

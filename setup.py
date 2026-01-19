@@ -24,7 +24,6 @@ setup(
     },
     data_files=[
         ('share/lumux/data', ['data/default_settings.json']),
-        ('share/lumux/data', ['data/default_zones.json']),
     ],
     python_requires='>=3.10',
     classifiers=[

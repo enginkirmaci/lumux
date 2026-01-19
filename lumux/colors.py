@@ -2,7 +2,7 @@
 
 from typing import Dict, Tuple, Optional
 
-from utils.rgb_xy_converter import rgb_to_xy, constrain_to_gamut, get_color_gamut
+from utils.rgb_xy_converter import rgb_to_xy
 import numpy as np
 
 
@@ -25,10 +25,6 @@ class ColorAnalyzer:
         r, g, b = rgb
         xy = rgb_to_xy(r, g, b)
         
-        if light_info:
-            gamut = get_color_gamut(light_info)
-            xy = constrain_to_gamut(xy[0], xy[1], gamut)
-
         brightness = self._calculate_brightness(rgb)
         
         return (xy, brightness)

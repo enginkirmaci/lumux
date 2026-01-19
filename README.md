@@ -5,7 +5,7 @@ Real-time ambient lighting synchronization for Philips Hue lights on Fedora Linu
 ## Features
 
 - Real-time screen capture and color synchronization
-- Multiple zone layouts (Ambilight, Grid, Custom)
+-- Multiple zone layouts (Ambilight, Grid)
 - GTK4 native interface
 - Optimized performance with configurable resolution and FPS
 - Support for multiple Hue zones and lights
@@ -77,7 +77,7 @@ lumux
    - The app key will be automatically populated
 
 4. **Zone Configuration** tab:
-   - Choose your zone layout (Ambilight, Grid, or Custom)
+   - Choose your zone layout (Ambilight or Grid)
    - Set grid dimensions if using grid layout
 
 5. **Sync Settings** tab:
@@ -105,8 +105,6 @@ Captures colors from screen edges (top, bottom, left, right). Best for lights pl
 ### Grid
 Divides screen into a configurable grid. Each grid cell maps to a zone. Good for setups with many lights.
 
-### Custom
-For advanced zone configuration (coming soon).
 
 ## Performance Tips
 

@@ -17,8 +17,6 @@ class HueSettings:
 @dataclass
 class CaptureSettings:
     scale_factor: float = 0.125
-    display_index: int = 0
-    rotation: int = 0  # 0, 90, 180, 270 (CCW)
 
 
 @dataclass
@@ -134,10 +132,6 @@ class SettingsManager:
     def _validate_settings(self):
         """Validate and clamp settings to valid ranges."""
         self._settings.capture.scale_factor = max(0.01, min(1.0, self._settings.capture.scale_factor))
-        self.settings.capture.display_index = max(0, min(10, self.settings.capture.display_index))
-        # Ensure rotation is one of [0, 90, 180, 270]
-        if self.settings.capture.rotation not in [0, 90, 180, 270]:
-            self.settings.capture.rotation = 0
         self._settings.zones.grid_rows = max(1, min(64, self._settings.zones.grid_rows))
         self._settings.zones.grid_cols = max(1, min(64, self._settings.zones.grid_cols))
         self._settings.sync.fps = max(1, min(60, self._settings.sync.fps))
@@ -146,7 +140,7 @@ class SettingsManager:
         self._settings.sync.smoothing_factor = max(0.0, min(1.0, self._settings.sync.smoothing_factor))
 
         self._settings.zones.layout = self._settings.zones.layout.lower()
-        if self._settings.zones.layout not in ['ambilight', 'grid', 'custom']:
+        if self._settings.zones.layout not in ['ambilight', 'grid']:
             self._settings.zones.layout = 'ambilight'
 
     def _ensure_config_dir(self):

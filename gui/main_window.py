@@ -3,7 +3,6 @@
 import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, GLib
-
 from lumux.app_context import AppContext
 from gui.settings_dialog import SettingsDialog
 from gui.zone_preview_widget import ZonePreviewWidget

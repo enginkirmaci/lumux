@@ -25,9 +25,7 @@ class ZoneProcessor:
         if self.layout == "ambilight":
             return self._process_ambilight(image)
         elif self.layout == "grid":
-            return self._process_grid(image)
-        elif self.layout == "custom":
-            return self._process_custom(image)
+            return self._process_grid(image) 
         else:
             return self._process_grid(image)
 
@@ -139,11 +137,7 @@ class ZoneProcessor:
         except Exception as e:
             print(f"Error processing ambilight: {e}")
             return {}
-
-    def _process_custom(self, image: Image.Image) -> Dict[str, tuple[int, int, int]]:
-        """Custom zone processing (placeholder for now)."""
-        return self._process_grid(image)
-
+ 
     def get_zone_count(self) -> int:
         """Get total number of zones based on layout."""
         if self.layout == "ambilight":

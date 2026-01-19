@@ -5,9 +5,7 @@
     "auto_discover": true
   },
   "capture": {
-    "scale_factor": 0.125,
-    "display_index": 0,
-    "rotation": 0
+    "scale_factor": 0.125
   },
   "zones": {
     "layout": "ambilight",

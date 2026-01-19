@@ -3,7 +3,7 @@
 import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk
-
+from lumux.bridge import HueBridge
 from lumux.app_context import AppContext
 
 
@@ -148,33 +148,6 @@ class SettingsDialog(Gtk.Dialog):
         scale_box.append(self.scale_spin)
         frame_box.append(scale_box)
 
-        display_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        display_label = Gtk.Label(label="Display Index:")
-        display_label.set_size_request(150, -1)
-        display_label.set_xalign(0)
-        self.display_adj = Gtk.Adjustment(
-            value=self.settings.capture.display_index,
-            lower=0, upper=10, step_increment=1
-        )
-        self.display_spin = Gtk.SpinButton(adjustment=self.display_adj)
-        display_box.append(display_label)
-        display_box.append(self.display_spin)
-        frame_box.append(display_box)
-
-        rotate_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        rotate_label = Gtk.Label(label="Screen Rotation:")
-        rotate_label.set_size_request(150, -1)
-        rotate_label.set_xalign(0)
-        self.rotate_combo = Gtk.ComboBoxText()
-        self.rotate_combo.append("0", "0°")
-        self.rotate_combo.append("90", "90° CCW")
-        self.rotate_combo.append("180", "180°")
-        self.rotate_combo.append("270", "270° CCW")
-        self.rotate_combo.set_active_id(str(self.settings.capture.rotation))
-        rotate_box.append(rotate_label)
-        rotate_box.append(self.rotate_combo)
-        frame_box.append(rotate_box)
-
         box.append(frame)
 
         return box
@@ -201,7 +174,6 @@ class SettingsDialog(Gtk.Dialog):
         self.layout_combo = Gtk.ComboBoxText()
         self.layout_combo.append("ambilight", "Ambilight")
         self.layout_combo.append("grid", "Grid")
-        self.layout_combo.append("custom", "Custom")
         self.layout_combo.set_active_id(self.settings.zones.layout)
         layout_box.append(layout_label)
         layout_box.append(self.layout_combo)
@@ -361,8 +333,6 @@ class SettingsDialog(Gtk.Dialog):
             self.settings.hue.bridge_ip = self.ip_entry.get_text()
             self.settings.hue.app_key = self.key_entry.get_text()
             self.settings.capture.scale_factor = self.scale_adj.get_value()
-            self.settings.capture.display_index = int(self.display_adj.get_value())
-            self.settings.capture.rotation = int(self.rotate_combo.get_active_id() or 0)
             self.settings.zones.layout = self.layout_combo.get_active_id()
             self.settings.zones.grid_rows = int(self.rows_adj.get_value())
             self.settings.zones.grid_cols = int(self.cols_adj.get_value())
@@ -372,4 +342,4 @@ class SettingsDialog(Gtk.Dialog):
             self.settings.sync.smoothing_factor = self.smoothing_adj.get_value()
             self.settings.save()
 
-        self.destroy()
+        self.close()

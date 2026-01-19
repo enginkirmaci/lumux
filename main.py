@@ -2,9 +2,7 @@
 
 import gi
 gi.require_version("Gtk", "4.0")
-
 from gi.repository import Gtk
-
 from config.settings_manager import SettingsManager
 from gui.main_window import MainWindow
 from lumux.app_context import AppContext

@@ -16,10 +16,8 @@ Gst.init(None)
 
 
 class ScreenCapture:
-    def __init__(self, scale_factor: float = 0.125, display_index: int = 0, rotation: int = 0):
+    def __init__(self, scale_factor: float = 0.125):
         self.scale_factor = scale_factor
-        self.display_index = display_index
-        self.rotation = rotation  # 0, 90, 180, 270 (CCW)
         self._display = None
         
         # Portal state
@@ -41,11 +39,7 @@ class ScreenCapture:
             # Import Gdk lazily - it's already loaded with version 4.0 from GUI
             from gi.repository import Gdk
             self._display = Gdk.Display.get_default()
-            if self._display:
-                monitors = self._display.get_monitors()
-                n_monitors = monitors.get_n_items()
-                if self.display_index >= n_monitors:
-                    self.display_index = 0
+            # Display index removed; we only keep a reference to the display
         except Exception as e:
             print(f"Error initializing display: {e}")
 
@@ -80,16 +74,8 @@ class ScreenCapture:
         return None
 
     def _process_image(self, screen: Image.Image) -> Image.Image:
-        """Apply rotation and scale image if needed."""
-        # 1. Apply Rotation
-        if self.rotation == 90:
-            screen = screen.transpose(Image.ROTATE_90)
-        elif self.rotation == 180:
-            screen = screen.transpose(Image.ROTATE_180)
-        elif self.rotation == 270:
-            screen = screen.transpose(Image.ROTATE_270)
-            
-        # 2. Apply Scaling - use BILINEAR for speed (LANCZOS is too slow)
+        """Apply scaling to image if needed."""
+        # Apply Scaling - use BILINEAR for speed (LANCZOS is too slow)
         if self.scale_factor < 1.0:
             new_size = (
                 int(screen.width * self.scale_factor),

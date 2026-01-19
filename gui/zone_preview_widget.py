@@ -25,7 +25,7 @@ class ZonePreviewWidget(Gtk.DrawingArea):
         """Update zone layout.
 
         Args:
-            layout: 'grid', 'ambilight', or 'custom'
+            layout: 'grid' or 'ambilight'
             rows: Number of rows for grid layout
             cols: Number of columns for grid/ambilight layout
         """

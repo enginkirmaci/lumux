@@ -26,8 +26,6 @@ class AppContext:
         self.bridge = HueBridge(settings.hue.bridge_ip, settings.hue.app_key)
         self.capture = ScreenCapture(
             scale_factor=settings.capture.scale_factor,
-            display_index=settings.capture.display_index,
-            rotation=settings.capture.rotation
         )
         self.zone_processor = ZoneProcessor(
             layout=settings.zones.layout,
@@ -74,8 +72,6 @@ class AppContext:
 
         capture = self.settings.capture
         self.capture.scale_factor = capture.scale_factor
-        self.capture.display_index = capture.display_index
-        self.capture.rotation = capture.rotation
 
         zones = self.settings.zones
         self.zone_processor.layout = zones.layout

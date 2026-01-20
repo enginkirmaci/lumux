@@ -166,7 +166,7 @@ class HueBridge:
             light_id: Light ID from bridge
             xy: Tuple of (x, y) coordinates
             brightness: Brightness value (0-254)
-            transition_time: Transition time in centiseconds (100 = 1 second)
+            transition_time: Transition time in milliseconds
         """
         if not self.bridge:
             return
@@ -187,6 +187,9 @@ class HueBridge:
                 'dimming': {'brightness': (brightness / 254.0) * 100.0},
                 'on': {'on': True},
             }
+
+            if transition_time is not None:
+                payload['dynamics'] = {'duration': int(max(0, transition_time))}
             
             # If it's a gradient light, we might still want to set a single color occasionally,
             # but usually we use set_light_gradient.
@@ -194,7 +197,8 @@ class HueBridge:
         except Exception as e:
             print(f"Error setting light color: {e}")
 
-    def set_light_gradient(self, light_id: str, fixed_points: List[Dict], brightness: int):
+    def set_light_gradient(self, light_id: str, fixed_points: List[Dict], brightness: int,
+                           transition_time: Optional[int] = None):
         """Set gradient light colors.
 
         Args:
@@ -208,13 +212,27 @@ class HueBridge:
         brightness = max(0, min(254, int(brightness)))
         
         try:
+            points = []
+            for point in fixed_points or []:
+                color = point.get('color') if isinstance(point, dict) else None
+                xy = color.get('xy') if isinstance(color, dict) else None
+                if isinstance(xy, dict) and 'x' in xy and 'y' in xy:
+                    points.append({'color': {'xy': {'x': xy['x'], 'y': xy['y']}}})
+
+            if len(points) < 2:
+                return
+
             payload = {
                 'gradient': {
-                    'points': fixed_points
+                    'points': points
                 },
                 'dimming': {'brightness': (brightness / 254.0) * 100.0},
                 'on': {'on': True}
             }
+
+            if transition_time is not None:
+                payload['dynamics'] = {'duration': int(max(0, transition_time))}
+
             self.bridge._put_by_id('light', light_id, payload)
         except Exception as e:
             print(f"Error setting light gradient: {e}")

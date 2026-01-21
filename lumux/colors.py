@@ -25,7 +25,7 @@ class ColorAnalyzer:
         """
         corrected_rgb = self._apply_gamma(rgb)
         r, g, b = corrected_rgb
-        xy = rgb_to_xy(r, g, b)
+        xy = rgb_to_xy(r, g, b, light_info=light_info)
         
         brightness = self._calculate_brightness(corrected_rgb)
         

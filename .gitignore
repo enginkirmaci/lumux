@@ -70,3 +70,4 @@ pip-selfcheck.json
 */__pycache__/*
 config/__pycache__/settings_manager.cpython-314.pyc
 config/__pycache__/zone_mapping.cpython-314.pyc
+Hue CLIP API.html

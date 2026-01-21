@@ -80,6 +80,7 @@ class HueBridge:
             for light_id, light_data in self.lights.items():
                 metadata = light_data.get('metadata', {})
                 gradient_data = light_data.get('gradient', {})
+                color_data = light_data.get('color', {})
                 self.light_info[light_id] = {
                     'id': light_id,
                     'name': metadata.get('name', f'Light {light_id}'),
@@ -89,6 +90,8 @@ class HueBridge:
                     'state': light_data.get('on', {}).get('on', False),
                     'is_gradient': 'points' in gradient_data or 'points_capable' in gradient_data,
                     'gradient_points': gradient_data.get('points_capable', 0),
+                    'gamut_type': color_data.get('gamut_type'),
+                    'gamut': color_data.get('gamut'),
                     'position': None # Will be filled from entertainment config
                 }
 

@@ -4,6 +4,12 @@ import queue
 import threading
 import time
 from typing import Dict, Tuple, Optional
+from datetime import datetime
+
+
+def _timed_print(*args, **kwargs):
+    prefix = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+    print(prefix, *args, **kwargs)
 
 from lumux.bridge import HueBridge
 from lumux.capture import ScreenCapture
@@ -66,7 +72,7 @@ class SyncController:
                     # Count how many zones this light is in
                     zone_count = sum(1 for lights in self.zone_mapping.mapping.values() if lid in lights)
                     if zone_count <= 1:
-                        print(f"Gradient light {lid} ('{info.get('name')}') is under-mapped ({zone_count} zone), forcing regeneration...")
+                        _timed_print(f"Gradient light {lid} ('{info.get('name')}') is under-mapped ({zone_count} zone), forcing regeneration...")
                         is_stale = True
                         break
 
@@ -75,7 +81,7 @@ class SyncController:
             if is_stale:
                 self.zone_mapping.mapping = {}
 
-            print(f"Generating mapping for layout: {self.zone_processor.layout}")
+            _timed_print(f"Generating mapping for layout: {self.zone_processor.layout}")
             if available_lights:
                 if self.zone_processor.layout == "ambilight":
                     self.zone_mapping.generate_ambilight_mapping(
@@ -93,12 +99,12 @@ class SyncController:
                         self.zone_processor.cols
                     )
                 
-                print(f"Active mapping for {len(available_lights)} lights:")
+                _timed_print(f"Active mapping for {len(available_lights)} lights:")
                 for lid in available_lights:
                     m_zones = [z for z, lits in self.zone_mapping.mapping.items() if lid in lits]
-                    print(f"  Light '{self.bridge.get_light_name(lid)}' -> {len(m_zones)} zones")
+                    _timed_print(f"  Light '{self.bridge.get_light_name(lid)}' -> {len(m_zones)} zones")
             else:
-                print("Warning: No lights available on bridge")
+                _timed_print("Warning: No lights available on bridge")
 
         self.running = True
         self.thread = threading.Thread(target=self._sync_loop, daemon=True, name="SyncLoop")
@@ -114,7 +120,7 @@ class SyncController:
         if self.thread:
             self.thread.join(timeout=3)
             if self.thread.is_alive():
-                print("Warning: Sync thread did not stop cleanly")
+                _timed_print("Warning: Sync thread did not stop cleanly")
         
         # Stop the capture pipeline to release portal session
         if hasattr(self.capture, 'stop_pipeline'):
@@ -170,13 +176,13 @@ class SyncController:
 
                 # Debug: occasionally log the effective target and measured FPS
                 if self._stats['frame_count'] % 100 == 0:
-                    print(f"Sync target FPS={fps_target}, target_delay={target_delay:.4f}s, measured_fps={self._stats['fps']:.1f}")
+                    _timed_print(f"Sync target FPS={fps_target}, target_delay={target_delay:.4f}s, measured_fps={self._stats['fps']:.1f}")
 
             except KeyboardInterrupt:
                 break
             except Exception as e:
                 self._stats['errors'] += 1
-                print(f"Sync loop error: {e}")
+                _timed_print(f"Sync loop error: {e}")
                 self._queue_status('error', str(e), None)
                 time.sleep(1)
 
@@ -232,7 +238,7 @@ class SyncController:
 
         # Log periodic timing summary to help diagnose bottlenecks
         if self._stats['frame_count'] % 30 == 0:
-            print(f"[timings] capture={self._stats['last_stage_times']['capture']}s zones={self._stats['last_stage_times']['zones']}s analyze={self._stats['last_stage_times']['analyze']}s smooth={self._stats['last_stage_times']['smooth']}s update={self._stats['last_stage_times']['update']}s total={self._stats['last_stage_times']['total']}s")
+            _timed_print(f"[timings] capture={self._stats['last_stage_times']['capture']}s zones={self._stats['last_stage_times']['zones']}s analyze={self._stats['last_stage_times']['analyze']}s smooth={self._stats['last_stage_times']['smooth']}s update={self._stats['last_stage_times']['update']}s total={self._stats['last_stage_times']['total']}s")
 
         # Send RGB colors to GUI for preview, not XY colors
         self._queue_status('status', 'syncing', zone_colors)
@@ -305,7 +311,7 @@ class SyncController:
                     avg_brightness = max(u[1][1] for u in updates)
                     
                     if self._stats['frame_count'] % 100 == 0:
-                        print(f"Sending gradient update for '{info.get('name')}' ({points_count} points, from {len(sorted_updates)} zones)")
+                        _timed_print(f"Sending gradient update for '{info.get('name')}' ({points_count} points, from {len(sorted_updates)} zones)")
 
                     payload = {
                         'type': 'gradient',
@@ -337,10 +343,10 @@ class SyncController:
                 
                 updated_count += 1
             except Exception as e:
-                print(f"Error updating light {light_id}: {e}")
+                _timed_print(f"Error updating light {light_id}: {e}")
         
         if updated_count == 0:
-            print(f"Warning: No lights updated. Zone mapping may be empty.")
+            _timed_print(f"Warning: No lights updated. Zone mapping may be empty.")
 
     def _queue_status(self, status_type: str, message, data=None):
         """Queue status update for GUI thread."""

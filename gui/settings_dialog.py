@@ -78,6 +78,10 @@ class SettingsDialog(Gtk.Dialog):
         key_label.set_size_request(100, -1)
         key_label.set_xalign(0)
         self.key_entry = Gtk.Entry(text=self.settings.hue.app_key)
+        # Hide the entry text for the App Key (password mode) and make it wider
+        self.key_entry.set_visibility(False)
+        self.key_entry.set_hexpand(True)
+        self.key_entry.set_size_request(300, -1)
         key_box.append(key_label)
         key_box.append(self.key_entry)
         frame_box.append(key_box)
@@ -108,10 +112,6 @@ class SettingsDialog(Gtk.Dialog):
         self.lights_label = Gtk.Label(label="Lights: 0")
         self.lights_label.set_xalign(0)
         status_box.append(self.lights_label)
-
-        self.zones_label = Gtk.Label(label="Zones: 0")
-        self.zones_label.set_xalign(0)
-        status_box.append(self.zones_label)
 
         box.append(status_frame)
 
@@ -204,6 +204,16 @@ class SettingsDialog(Gtk.Dialog):
         cols_box.append(cols_label)
         cols_box.append(self.cols_spin)
         frame_box.append(cols_box)
+
+        preview_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        preview_label = Gtk.Label(label="Show Zone Preview:")
+        preview_label.set_size_request(150, -1)
+        preview_label.set_xalign(0)
+        self.preview_check = Gtk.CheckButton(label="Enable preview")
+        self.preview_check.set_active(self.settings.zones.show_preview)
+        preview_box.append(preview_label)
+        preview_box.append(self.preview_check)
+        frame_box.append(preview_box)
 
         box.append(frame)
 
@@ -335,11 +345,9 @@ class SettingsDialog(Gtk.Dialog):
         if status.connected:
             self.bridge_status_label.set_text("Connected")
             self.lights_label.set_text(f"Lights: {status.light_count}")
-            self.zones_label.set_text(f"Zones: {len(self.bridge.get_zone_ids())}")
         else:
             self.bridge_status_label.set_text("Not connected")
             self.lights_label.set_text("Lights: 0")
-            self.zones_label.set_text("Zones: 0")
 
     def _on_response(self, dialog, response):
         """Handle dialog response."""
@@ -350,6 +358,12 @@ class SettingsDialog(Gtk.Dialog):
             self.settings.zones.layout = self.layout_combo.get_active_id()
             self.settings.zones.grid_rows = int(self.rows_adj.get_value())
             self.settings.zones.grid_cols = int(self.cols_adj.get_value())
+            # Preview toggle
+            try:
+                self.settings.zones.show_preview = bool(self.preview_check.get_active())
+            except AttributeError:
+                # Older settings without the flag
+                pass
             self.settings.sync.fps = int(self.sync_fps_adj.get_value())
             self.settings.sync.transition_time_ms = int(self.transition_adj.get_value())
             self.settings.sync.brightness_scale = self.brightness_adj.get_value()

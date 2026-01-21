@@ -24,6 +24,7 @@ class ZoneSettings:
     layout: str = "ambilight"
     grid_rows: int = 16
     grid_cols: int = 16
+    show_preview: bool = True
 
 
 @dataclass
@@ -99,6 +100,7 @@ class SettingsManager:
                 
                 self._settings.hue = HueSettings(**data.get('hue', {}))
                 self._settings.capture = CaptureSettings(**data.get('capture', {}))
+                # Ensure we pass show_preview through when present
                 self._settings.zones = ZoneSettings(**data.get('zones', {}))
                 self._settings.sync = SyncSettings(**data.get('sync', {}))
             except (json.JSONDecodeError, TypeError) as e:

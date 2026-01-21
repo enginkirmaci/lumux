@@ -17,6 +17,9 @@ class MainWindow(Gtk.ApplicationWindow):
         self.sync_controller = app_context.sync_controller
         self.settings = app_context.settings
         self.bridge_connected = False
+        # Window size presets
+        self._preview_size = (900, 700)
+        self._compact_size = (640, 480)
 
         self._build_ui()
         self._check_bridge_connection()
@@ -26,7 +29,6 @@ class MainWindow(Gtk.ApplicationWindow):
     def _build_ui(self):
         """Build main window layout."""
         self.set_title("Lumux for Philips Hue Sync")
-        self.set_default_size(900, 700)
 
         header = Gtk.HeaderBar()
         settings_btn = Gtk.Button(label="Settings")
@@ -63,13 +65,13 @@ class MainWindow(Gtk.ApplicationWindow):
 
         main_box.append(status_frame)
 
-        preview_frame = Gtk.Frame(label="Zone Preview")
+        self.preview_frame = Gtk.Frame(label="Zone Preview")
         preview_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         preview_box.set_margin_top(10)
         preview_box.set_margin_bottom(10)
         preview_box.set_margin_start(10)
         preview_box.set_margin_end(10)
-        preview_frame.set_child(preview_box)
+        self.preview_frame.set_child(preview_box)
 
         self.zone_preview = ZonePreviewWidget(
             rows=self.settings.zones.grid_rows,
@@ -81,8 +83,10 @@ class MainWindow(Gtk.ApplicationWindow):
             self.settings.zones.grid_cols
         )
         preview_box.append(self.zone_preview)
-
-        main_box.append(preview_frame)
+        # Show or hide the preview based on settings
+        self.preview_frame.set_child(preview_box)
+        self.preview_frame.set_visible(self.settings.zones.show_preview)
+        main_box.append(self.preview_frame)
 
         control_frame = Gtk.Frame(label="Controls")
         control_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
@@ -117,6 +121,9 @@ class MainWindow(Gtk.ApplicationWindow):
 
         main_box.append(control_frame)
 
+        # Apply initial window sizing based on preview setting
+        self._apply_window_size()
+
     def _check_bridge_connection(self):
         """Check if bridge is connected and update UI accordingly."""
         status = self.app_context.get_bridge_status(attempt_connect=True)
@@ -137,6 +144,21 @@ class MainWindow(Gtk.ApplicationWindow):
             self.start_btn.set_sensitive(False)
             self.info_label.set_visible(True)
 
+    def _apply_window_size(self):
+        """Set default and attempt runtime resize according to `show_preview` setting."""
+        preview = getattr(self.settings.zones, 'show_preview', True)
+        # set_default_size so GTK has a proper initial size
+        if preview:
+            self.set_default_size(*self._preview_size)
+        else:
+            self.set_default_size(*self._compact_size)
+
+        # try runtime resize for immediate effect (may not be supported everywhere)
+        try:
+            self.resize(*(self._preview_size if preview else self._compact_size))
+        except Exception:
+            pass
+
     def _update_status(self) -> bool:
         """Check for status updates from sync thread."""
         # Drain the queue to get the latest status
@@ -154,8 +176,12 @@ class MainWindow(Gtk.ApplicationWindow):
                 if message == 'syncing':
                     self.status_label.set_text("Syncing...")
                     zone_colors = last_status[2]
-                    if zone_colors:
-                        self.zone_preview.update_colors(zone_colors)
+                    if zone_colors and getattr(self.settings.zones, 'show_preview', True):
+                        # Only update preview when enabled
+                        try:
+                            self.zone_preview.update_colors(zone_colors)
+                        except Exception:
+                            pass
                 elif message == 'stopped':
                     self.status_label.set_text("Stopped")
                     self.start_btn.set_sensitive(True)
@@ -203,12 +229,16 @@ class MainWindow(Gtk.ApplicationWindow):
         self.app_context.apply_settings()
         self._check_bridge_connection()
         
-        # Refresh Zone Preview widget with new layout/grid size
+        # Update preview visibility and layout
+        self.preview_frame.set_visible(self.settings.zones.show_preview)
         self.zone_preview.set_layout(
             self.settings.zones.layout,
             self.settings.zones.grid_rows,
             self.settings.zones.grid_cols
         )
+
+        # Apply window sizing centrally
+        self._apply_window_size()
 
         return False
 

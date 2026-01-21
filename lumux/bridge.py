@@ -276,10 +276,6 @@ class HueBridge:
             return info.get('name', f"Light {light_id}")
         return f"Light {light_id}"
 
-    def get_zone_ids(self) -> List[str]:
-        """Get list of all zone IDs."""
-        return list(self.zones.keys())
-
     def get_light_names(self) -> Dict[str, str]:
         """Get mapping of light IDs to names."""
         return {light_id: info['name'] for light_id, info in self.light_info.items()}

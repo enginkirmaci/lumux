@@ -1,0 +1,198 @@
+
+Hue Entertainment API
+The Hue Entertainment API supports a communication protocol which allows a light streaming functionality with the Philips Hue System. Using this protocol, it is possible to stream lighting effects to multiple lights in parallel with a high update rate.
+
+‘Philips Hue Entertainment’ is a major feature for the Philips Hue v2 bridge, Philips color capable lights and the Philips Hue app which strengthens lighting system’s integration into any home entertainment experience.
+
+Our goal with Hue Entertainment is to fully immerse Hue users in their music, TV, movies and video games with high-quality, synchronized lighting effects.
+
+As you may already know, wireless communication with Philips Hue is based on the ‘Zigbee’ protocol. Zigbee uses a mesh network where every light repeats a message, providing simple, secure and reliable coverage in any home. This technology is fantastic for scene setting and automated-command use cases but runs into limitations when we try to push fast-changing special effects in live entertainment content.
+
+To create the synchronized effect we wanted, Hue Entertainment is developed as a new streaming-optimized interface which co-exists next to Zigbee.
+How Hue Entertainment works
+
+A Hue Entertainment command is built through the following process:
+
+    The command packages together the target state of up to 10 light channels in a custom Zigbee message.
+    This message is sent as a unicast over the mesh network to an automatically chosen proxy node in the target entertainment room.
+    This proxy node sends out a non-repeating low level MAC layer broadcast which all nearby lights will hear.
+    The nearby lights unbundle the message and act on their states.
+
+Since the command is unicasting together with MAC broadcasts, we can stream commands 25 times per second to any light in the home whilst still creating spatial effects across multiple lights, all without causing network congestion.
+
+Additionally, the mechanism has no retries, which benefits an entertainment setting where synchronization is critical: for example, a delayed frame from an explosion in an action movie is worse than skipping the frame entirely.
+A dedicated API and SDK
+
+The need for a time synchronization-driven interface led us towards a dedicated bridge-streaming API for Hue Entertainment. This bridge API is based on UDP/IP (with DTLS for security) rather than HTTP, allowing us to drop frames to maintain synchronization as necessary.
+
+We released a dedicated software development kit we’ve created, so developers can easily build applications combining lighting and entertainment. Called the Hue Entertainment Development Kit (EDK), it is written in C++ with portability and usability in the gaming world in mind.
+
+The EDK not only wraps the Hue bridge discovery and streaming API, but also provides a light effect-rendering engine. Often, replicating effects in a room needs to be independent of the specific home setup, so the EDK takes care of mapping spatial effects onto the user’s specific entertainment layout, which is created in the Hue app. This means the explosion or lightning to your left can be programmed to affect all three lights on that side of the room, or just one light, depending on your setup.
+
+The user entertainment configuration indicating which lights they use and where they are placed is stored on the bridge. This way you can reuse the user’s specific entertainment layout with other applications, such that a user is not bothered every time with creating the setup. Actually, the creation of the home entertainment setup is an integral part of the Hue app which makes it easier for your app to start.
+
+The EDK will also include the setup of the security with the bridge. This means that you do not have to bother with the DTLS setup and encryption of the content of the stream.
+
+It is recommended to use the Philips Hue entertainment EDK, however, in case you want to make your own implementation or library to stream to the Hue bridge we will explain the Hue bridge API’s in the next chapters.
+
+The EDK contains a robust connection flow and provides helper classes to create effects easily. For EDK information, see developer page.
+Getting started with Streaming API
+
+To get started with the streaming API from scratch without the use of the SDK or EDK you can use the follow steps to get it operational:
+
+    Find the IP address of the bridge in the network, see also getting-started
+    Verify that the bridge has software version 1948086000 or higher (check “swversion” in the returned parameter when performing a GET on https://<ip-address>/api/config )
+    The Hue bridge uses DTLS to secure the streaming data. Before you can stream to the bridge, you first need to authenticate. Your application needs to create a username (see also getting-started), and set generateclientkey to true. E.g. by performing a POST on https://<ip-address>/api with for instance the following body:
+
+{
+    "devicetype":"myapplication#myiphone",
+    "generateclientkey":true
+}
+
+This will return the username and a random 16 byte clientkey in case the user push links the bridge. This key is encoded as ASCII hex string of length 32, e.g.
+[
+    {
+         "success":{
+              "username":"myzFXhsLU5Wg10eBithGE-LFikgjC7Q7SEGZsoEf",
+              "clientkey":"E3B550C65F78022EFD9E52E28378583"
+                   }
+     }
+]
+
+The “username” is used as “hue-application-key” in the REST requests to retrieve and control the entertainment configurations. The “clientkey” is used as the Pre-Shared Key (PSK) in the DTLS streaming connection. The clientkey is only exposed in the response once and can not be retrieved again. It never expires, and remains valid as long as the whitelist entry of your app is in the bridge. Once you have retrieved the username and clientkey, you need to retrieve a hue-application-id. This can be done by performing a GET on https://<ip-address>/auth/v1 endpoint with the username in the hue-application-key header. If the application key is valid, the bridge will respond with 200 OK and a ‘hue-application-id’ response header. This hue-application-id is used for the PSK identity when setting up the DTLS connection. It is also used in the active_streamer field on the entertainment configuration to determine which application is currently streaming to that configuration.
+
+    The Hue app makes it is possible to create an entertainment area, select lights and place them in somewhere in a room visualized by the GUI of the Hue app. This area has a type identifier “entertainment”, and this type of areas can contain a list of the lights and their x/y position within in the room in relation to a screen and the position of the user. The position of the user and the screen can be used to make optimal special lighting effects in the room of the user.
+
+You can retrieve the list of entertainment areas with a GET request on entertainment configuration resource:
+Address 	https://<bridge IP address>/clip/v2/resource/entertainment_configuration
+Method 	GET
+Header 	hue-application-key: <appkey (== "username")>
+
+This is an example of the relevant fields for a single area:
+{
+    "id": "1a8d99cc-967b-44f2-9202-43f976c0fa6b",
+    "type": "entertainment_configuration",
+    "metadata": { "name": "Entertainment area 1" },
+    "configuration_type": "screen",
+    "channels": [
+        {
+            "channel_id": 0,
+            "position": { "x": -0.6, "y": 0.8, "z": 0.0 }
+        },
+        {
+            "channel_id": 1,
+            "position": { "x": 0.6, "y": 0.8, "z": 0.0 }
+        }
+    ],
+    "status": "inactive"
+}
+
+If there is only one area, you can use it by default. If there are multiple areas, you should let the user select one by name. In case there is no area yet, you can point the user towards the Hue app to create one. If your app is on Android or iOS you could deeplink for extra convenience:
+
+    Android intent: hue.settings.ADD_ENTERTAINMENT_AREA with the BRIDGEID argument.
+    iOS URL schema: hue2sync://entertainment-setup?bridge_id=${bridgeId ?? "--"} where bridgeId is parameter.
+
+
+
+    Send a start action, using PUT to entertainment_configuration/<identifier of entertainment configuration>
+
+
+Address 	https://<bridge IP address>/clip/v2/entertainment_configuration/<id>
+Method 	PUT
+Header 	hue-application-key: <appkey>
+Body 	{"action":"start"}
+
+Only one stream can be active for an entertainment area, the active_streamer field in the entertainment configuration indicates the application which is currently streaming.
+
+    Once the status has changed to active, you can start the DTLS handshaking with the bridge, which will generate a session key. More information below in DTLS Handshaking. It is advised to use a DTLS library for your application, e.g. mbedtls.
+    After a successful handshake you can start to stream to the bridge, to stream to the light within the area. More information below in Streaming Message Format. After 10 seconds of no activity the connection is closed automatically, and status is set back to inactive. It is advised to send a continuous stream of messages, if necessary the same message, due to the lossy behavior. The recommended steaming speed is around 50-60 frames/sec.
+    You can stop the streaming by setting {“action”:”stop”}
+
+DTLS Handshaking
+
+UDP port 2100 is used for DTLS handshaking and streaming. Only DTLS mode version 1.2 with Pre-Shared Key (PSK) Key exchange method with TLS_PSK_WITH_AES_128_GCM_SHA256 set as Cipher Suite is supported.
+
+The PSK is provided by the CLIP authentication passing the {“generateclientkey”=true} parameter when push linking your application.
+
+The PSK is derived from the “client key” in the response by decoding the 32 character ASCII hex string into its 16 byte binary representation.
+
+The PSK identity exactly matches the “hue-application-id” (ASCII / UTF-8 string). Retrieving your application id can be done by performing a GET on `/auth/v1` endpoint with the hue-application-key header. When authenticated, the bridge will respond with 200 OK and a ‘hue-application-id’ response header.
+
+Below table describes the error types which the Hue bridge streaming server can respond to the client.
+Error 	Type 	Description
+protocol_version 	Fatal 	DTLS version not supported
+insufficient_security 	Fatal 	Higher cipher security required
+handshake_failure 	Fatal 	Other insufficient security parameters
+user_cancelled 	Warning 	Maximum number of sessions already active
+unknown_psk_identity 	Fatal 	Unknown identity
+decrypt_error 	Fatal 	Invalid PSK
+close_notify 	Fatal 	Notification that server will disconnect e.g. because streaming is disabled via CLIP
+Internal_error 	Fatal 	Internal bridge error
+unexpected_message 	Fatal 	Protocol failure
+decode_error 	Fatal 	Protocol failure
+bad_record_mac 	Fatal 	Protocol failure
+Streaming and Stream message format
+
+As soon the DTLS handshaking has taken place, you can start streaming UDP (encrypted) messages towards port 2100 of the Hue bridge.
+
+Protocol uses big (network) endianness, and every message has a header of 16 bytes, the entertainment configuration UUID of 36 bytes, and then the data for the light channels. The data for the channels can be variable depending on the number of channels to be controlled in the message, in which every light channel uses 7 bytes, consisting of ID and RGB16 color values. Maximum 20 channels are supported in a message.
+Field 	Name 	Size (bytes) 	Description
+1 	Protocol name 	9 	Array of 9 characters{‘H’, ‘u’, ‘e’, ‘S’, ‘t’, ‘r’, ‘e’, ‘a’, ‘m’}
+2 	Version 	2 	Streaming API version 1 byte major version (0x02), 1 byte minor version (0x00)
+3 	Sequence ID 	1 	Can be used to indicate the message sequence number. Currently it is ignored by the bridge.
+4 	Reserved 	2 	Reserved, all zeros should be sent.
+5 	Color space 	1 	0x00 = RGB; 0x01 = XY Brightness
+6 	Reserved 	1 	Reserved, all zeros should be sent.
+7 	entertainment configuration id 	36 	clipv2 uuid of the entertainment configuration to stream to
+8-27 	Data [channel slots] 	7 * #channels 	Maximum 20 slots of color data, each containing 7 bytes consisting of:
+	ID 	1 	ID of the channel
+	Value 	3 * 2 	RGB or XY+Brightness with 16 bit resolution per element
+
+Example of a stream message:
+Example
+{
+
+‘H’, ‘u’, ‘e’, ‘S’, ‘t’, ‘r’, ‘e’, ‘a’, ‘m’, //protocol
+
+0x02, 0x00, //version 2.0
+
+0x07, //sequence number 7
+
+0x00, 0x00, //Reserved write 0’s
+
+0x00, //color mode RGB
+
+0x00, //Reserved, write 0’s
+
+“1a8d99cc-967b-44f2-9202-43f976c0fa6b”, //entertainment configuration id
+
+0x00, //channel ID 0
+
+0xff, 0xff, 0x00, 0x00, 0x00, 0x00, //red
+
+0x01, //channel ID 1
+
+0x00, 0x00, 0x00, 0x00, 0xff, 0xff //blue
+
+}
+
+
+
+The color space formats supported are RGB and xy+Brightness. RGB can be used for simplicity and to get the widest range of colors for each bulb. However, to get full color consistency over various types of lamps (i.e. gamuts) and/or match with RGB values of typical displays who have a much narrower color range, you can send xy+Brightness values, as these are hardware independent.
+
+Every individual color component has a 16 bit resolution on the API. RGB values are converted into xy+Brightness by the Hue bridge. The x and y values supported by the lamps have a 12-bits resolution, and brightness 11 bits. This means that the 16 bit resolution on the API will be truncated.
+
+For xy, the minimum value of 0x0000 is equivalent to 0.00000, and 0xffff is equivalent to 1.00000
+
+The used color space format is defined in the “Color space” byte part of the message header.
+Best Practices
+
+Please keep the following in mind for best practices:
+
+    The streaming makes use of UDP, which can result in that certain messages get lost, that is why it is important to continuously stream messages, even when it would mean repeating the same messages or light values, typically a streaming rate of 50-60Hz is used.
+    As soon you are streaming to lights, regular API commands will change light settings in the background, but are not visible on the light (they would continuously be overwritten), so during this time the brightness/color values on the API will not match what you see on the light.
+    The bridge sends maximum at 25 Hz messages over ZigBee. Thus, the (fastest) effect rate should be 2 – 3 times slower than this 25 Hz, i.e < 12.5 Hz.
+    In case you no longer stream, disable it.
+    Only one streaming session can take place at a time.
+    Please notify or warn the user that your application makes use of fast changing light effects conditions alone, or in combination with certain content on the screen it may trigger previously undetected epileptic symptoms or seizures in persons who have no history of prior seizures or epilepsy.
+

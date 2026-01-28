@@ -15,27 +15,31 @@ from lumux.bridge import HueBridge
 from lumux.capture import ScreenCapture
 from lumux.zones import ZoneProcessor
 from lumux.colors import ColorAnalyzer
+from lumux.entertainment import EntertainmentStream
 from config.zone_mapping import ZoneMapping
-from typing import Optional
 
 
 class SyncController:
     def __init__(self, bridge: HueBridge, capture: ScreenCapture,
                  zone_processor: ZoneProcessor, color_analyzer: ColorAnalyzer,
-                 zone_mapping: ZoneMapping, settings, light_updater: Optional[object] = None):
+                 zone_mapping: ZoneMapping, settings, 
+                 entertainment_stream: Optional[EntertainmentStream] = None):
         self.bridge = bridge
         self.capture = capture
         self.zone_processor = zone_processor
         self.color_analyzer = color_analyzer
         self.zone_mapping = zone_mapping
         self.settings = settings
-        self.light_updater = light_updater
+        self.entertainment_stream = entertainment_stream
 
         self.running = False
         self.thread: Optional[threading.Thread] = None
         self.previous_colors: Dict[str, Tuple[Tuple[float, float], int]] = {}
         self.queue: queue.Queue = queue.Queue(maxsize=100)
         self.lock = threading.Lock()
+
+        # Zone to channel mapping for entertainment streaming
+        self._zone_channel_map: Dict[str, int] = {}
 
         self._stats = {
             'fps': 0,
@@ -49,66 +53,101 @@ class SyncController:
         if self.running:
             return
 
-        self.zone_mapping.mapping = {}
-        
-        # Check if existing mapping is valid
-        available_lights = self.bridge.get_light_ids()
-        is_stale = False
-        
-        # 1. Check if lights in mapping still exist
-        mapping_lights = set()
-        for lights in self.zone_mapping.mapping.values():
-            for l in lights: mapping_lights.add(l)
-        
-        if mapping_lights and not any(l in available_lights for l in mapping_lights):
-            is_stale = True
-            
-        # 2. Check if gradient lights are properly mapped to multiple zones
-        # If a light is a gradient light but only appears in 1 zone total, it's poorly mapped
-        if not is_stale and available_lights:
-            for lid in available_lights:
-                info = self.bridge.light_info.get(lid, {})
-                if info.get('is_gradient'):
-                    # Count how many zones this light is in
-                    zone_count = sum(1 for lights in self.zone_mapping.mapping.values() if lid in lights)
-                    if zone_count <= 1:
-                        _timed_print(f"Gradient light {lid} ('{info.get('name')}') is under-mapped ({zone_count} zone), forcing regeneration...")
-                        is_stale = True
-                        break
-
-        # Auto-generate zone mapping if empty or stale
-        if not any(self.zone_mapping.mapping.values()) or is_stale:
-            if is_stale:
-                self.zone_mapping.mapping = {}
-
-            _timed_print(f"Generating mapping for layout: {self.zone_processor.layout}")
-            if available_lights:
-                if self.zone_processor.layout == "ambilight":
-                    self.zone_mapping.generate_ambilight_mapping(
-                        available_lights,
-                        light_info=self.bridge.light_info,
-                        top_count=self.zone_processor.cols,
-                        bottom_count=self.zone_processor.cols,
-                        left_count=max(1, self.zone_processor.rows // 2),
-                        right_count=max(1, self.zone_processor.rows // 2)
-                    )
-                else:
-                    self.zone_mapping.generate_grid_mapping(
-                        available_lights,
-                        self.zone_processor.rows,
-                        self.zone_processor.cols
-                    )
-                
-                _timed_print(f"Active mapping for {len(available_lights)} lights:")
-                for lid in available_lights:
-                    m_zones = [z for z, lits in self.zone_mapping.mapping.items() if lid in lits]
-                    _timed_print(f"  Light '{self.bridge.get_light_name(lid)}' -> {len(m_zones)} zones")
+        # Build zone to channel mapping for entertainment streaming
+        if self.entertainment_stream:
+            _timed_print(f"Entertainment stream object exists, connected={self.entertainment_stream.is_connected()}")
+            if self.entertainment_stream.is_connected():
+                self._build_zone_channel_mapping()
+                _timed_print(f"Using entertainment streaming with {len(self._zone_channel_map)} zone-channel mappings")
             else:
-                _timed_print("Warning: No lights available on bridge")
+                _timed_print("Warning: Entertainment stream exists but not connected")
+        else:
+            _timed_print("Warning: No entertainment stream configured")
 
         self.running = True
         self.thread = threading.Thread(target=self._sync_loop, daemon=True, name="SyncLoop")
         self.thread.start()
+
+    def _build_zone_channel_mapping(self):
+        """Build mapping from screen zones to entertainment channels based on positions."""
+        if not self.entertainment_stream:
+            return
+
+        self._zone_channel_map.clear()
+        channel_positions = self.entertainment_stream.get_channel_positions()
+
+        if not channel_positions:
+            _timed_print("Warning: No channel positions available")
+            return
+
+        # Get all zone IDs that will be used
+        # For ambilight: top_0..top_n, left_0..left_n, right_0..right_n, bottom_0..bottom_n
+        if self.zone_processor.layout == "ambilight":
+            zones = []
+            for edge in ['top', 'bottom', 'left', 'right']:
+                if edge in ['top', 'bottom']:
+                    count = self.zone_processor.cols
+                else:
+                    count = max(1, self.zone_processor.rows // 2)
+                for i in range(count):
+                    zones.append(f"{edge}_{i}")
+        else:
+            # Grid layout
+            zones = [f"{r}_{c}" for r in range(self.zone_processor.rows) 
+                     for c in range(self.zone_processor.cols)]
+
+        # Map each zone to nearest channel based on position
+        for zone_id in zones:
+            channel_id = self._find_best_channel_for_zone(zone_id, channel_positions)
+            if channel_id is not None:
+                self._zone_channel_map[zone_id] = channel_id
+
+        _timed_print(f"Zone-channel mapping: {len(self._zone_channel_map)} zones mapped to {len(set(self._zone_channel_map.values()))} channels")
+
+    def _find_best_channel_for_zone(self, zone_id: str, channel_positions: Dict[int, dict]) -> Optional[int]:
+        """Find the best matching channel for a screen zone based on position."""
+        try:
+            parts = zone_id.split('_')
+            if len(parts) == 2:
+                edge, idx_str = parts
+                idx = int(idx_str)
+            else:
+                # Grid zone like "0_0"
+                return list(channel_positions.keys())[0] if channel_positions else None
+        except ValueError:
+            return list(channel_positions.keys())[0] if channel_positions else None
+
+        # Convert screen edge/index to expected position range
+        # Entertainment positions: x is left(-1) to right(+1), z is bottom(-1) to top(+1)
+        if edge == 'left':
+            target_x = -1.0
+            # Left zones go from top (idx=0) to bottom (idx=n)
+            target_z = 1.0 - (idx * 2.0 / max(1, self.zone_processor.rows // 2 - 1)) if self.zone_processor.rows > 2 else 0
+        elif edge == 'right':
+            target_x = 1.0
+            target_z = 1.0 - (idx * 2.0 / max(1, self.zone_processor.rows // 2 - 1)) if self.zone_processor.rows > 2 else 0
+        elif edge == 'top':
+            target_z = 1.0
+            target_x = -1.0 + (idx * 2.0 / max(1, self.zone_processor.cols - 1)) if self.zone_processor.cols > 1 else 0
+        elif edge == 'bottom':
+            target_z = -1.0
+            target_x = -1.0 + (idx * 2.0 / max(1, self.zone_processor.cols - 1)) if self.zone_processor.cols > 1 else 0
+        else:
+            return list(channel_positions.keys())[0] if channel_positions else None
+
+        # Find closest channel
+        best_channel = None
+        best_distance = float('inf')
+
+        for channel_id, pos in channel_positions.items():
+            cx = pos.get('x', 0)
+            cz = pos.get('z', 0)
+            distance = (cx - target_x) ** 2 + (cz - target_z) ** 2
+            if distance < best_distance:
+                best_distance = distance
+                best_channel = channel_id
+
+        return best_channel
 
     def stop(self):
         """Stop sync thread."""
@@ -125,13 +164,6 @@ class SyncController:
         # Stop the capture pipeline to release portal session
         if hasattr(self.capture, 'stop_pipeline'):
             self.capture.stop_pipeline()
-
-        # Stop light updater if present
-        try:
-            if getattr(self, 'light_updater', None):
-                self.light_updater.stop()
-        except Exception:
-            pass
 
     def is_running(self) -> bool:
         """Check if sync is running."""
@@ -244,109 +276,38 @@ class SyncController:
         self._queue_status('status', 'syncing', zone_colors)
 
     def _update_lights(self, hue_colors: Dict[str, Tuple[Tuple[float, float], int]]):
-        """Send color updates to Hue bridge."""
+        """Send color updates via entertainment streaming."""
         if not hue_colors:
             return
-            
-        transition_time = self.settings.transition_time_ms
-        updated_count = 0
 
-        # Create a mapping of light_id -> list of colors from mapped zones
-        light_updates = {}
+        if not self.entertainment_stream or not self.entertainment_stream.is_connected():
+            if self._stats['frame_count'] % 300 == 0:
+                _timed_print("Warning: Entertainment stream not connected, skipping update")
+            return
+
+        # Convert zone colors to channel colors
+        channel_colors: Dict[int, Tuple[Tuple[float, float], int]] = {}
+
         for zone_id, color_data in hue_colors.items():
-            light_ids = self.zone_mapping.get_lights_for_zone(zone_id)
-            for lid in light_ids:
-                if lid not in light_updates:
-                    light_updates[lid] = []
-                # Keep track of which zone this color came from for gradient mapping
-                light_updates[lid].append((zone_id, color_data))
+            channel_id = self._zone_channel_map.get(zone_id)
+            if channel_id is None:
+                continue
 
-        for light_id, updates in light_updates.items():
-            info = self.bridge.light_info.get(light_id, {})
-            is_gradient = info.get('is_gradient', False)
-            
-            try:
-                if is_gradient:
-                    # Handle gradient light
-                    points_count = info.get('gradient_points', 3)
-                    if points_count == 0: points_count = 3 # Default to 3
-                    
-                    # Map zones to gradient points
-                    # For PC lightstrip: [Left, Top, Right] or similar
-                    # We'll try to sort updates by zone type (left, top, right, bottom)
-                    
-                    # Sort updates to ensure deterministic mapping: left -> top -> right -> bottom
-                    def zone_order(item):
-                        zid = item[0]
-                        try:
-                            edge, idx_str = zid.split('_')
-                            idx = int(idx_str)
-                        except:
-                            return (9, 0)
-                        
-                        # Recommended order for PC lightstrip (starts bottom-left, goes clockwise):
-                        # 1. Left edge: index 0 (top) down to index N (bottom) - wait, let's reverse for wrap
-                        # In ZoneProcessor, left_0 is TOP, left_N is BOTTOM.
-                        # So for wrap starting at bottom-left:
-                        if edge == 'left': return (0, -idx) # reverse: bottom-to-top
-                        if edge == 'top': return (1, idx)   # left-to-right
-                        if edge == 'right': return (2, idx) # top-to-bottom
-                        if edge == 'bottom': return (3, -idx) # right-to-left
-                        return (4, idx)
-                    
-                    sorted_updates = sorted(updates, key=zone_order)
-                    
-                    fixed_points = []
-                    # Distribute the available zone colors across the supported gradient points
-                    for i in range(points_count):
-                        # Pick the best available zone color for this point
-                        idx = int(i * len(sorted_updates) / points_count)
-                        z_id, (xy, br) = sorted_updates[idx]
-                        fixed_points.append({
-                            'color': {'xy': {'x': xy[0], 'y': xy[1]}},
-                            'dimming': {'brightness': (br / 254.0) * 100.0}
-                        })
-                    
-                    # Use average brightness for the overall light level
-                    avg_brightness = max(u[1][1] for u in updates)
-                    
-                    if self._stats['frame_count'] % 100 == 0:
-                        _timed_print(f"Sending gradient update for '{info.get('name')}' ({points_count} points, from {len(sorted_updates)} zones)")
+            xy, brightness = color_data
 
-                    payload = {
-                        'type': 'gradient',
-                        'fixed_points': fixed_points,
-                        'brightness': int(avg_brightness)
-                    }
+            # If multiple zones map to the same channel, average them
+            if channel_id in channel_colors:
+                existing_xy, existing_bri = channel_colors[channel_id]
+                # Simple average
+                new_xy = ((existing_xy[0] + xy[0]) / 2, (existing_xy[1] + xy[1]) / 2)
+                new_bri = (existing_bri + brightness) // 2
+                channel_colors[channel_id] = (new_xy, new_bri)
+            else:
+                channel_colors[channel_id] = (xy, brightness)
 
-                    if self.light_updater:
-                        self.light_updater.enqueue(light_id, payload)
-                    else:
-                        self.bridge.set_light_gradient(light_id, fixed_points, int(avg_brightness))
-                else:
-                    # Normal light - use the first (or average) color
-                    xy, brightness = updates[0][1]
-                    payload = {
-                        'type': 'color',
-                        'xy': xy,
-                        'brightness': brightness,
-                        'transition_time': transition_time
-                    }
-
-                    if self.light_updater:
-                        self.light_updater.enqueue(light_id, payload)
-                    else:
-                        self.bridge.set_light_color(
-                            light_id, xy, brightness,
-                            transition_time=transition_time
-                        )
-                
-                updated_count += 1
-            except Exception as e:
-                _timed_print(f"Error updating light {light_id}: {e}")
-        
-        if updated_count == 0:
-            _timed_print(f"Warning: No lights updated. Zone mapping may be empty.")
+        # Send to all channels via DTLS
+        if channel_colors:
+            self.entertainment_stream.send_colors_xy(channel_colors)
 
     def _queue_status(self, status_type: str, message, data=None):
         """Queue status update for GUI thread."""

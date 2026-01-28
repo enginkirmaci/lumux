@@ -131,7 +131,8 @@ class MainWindow(Gtk.ApplicationWindow):
         
         if self.bridge_connected:
             if status.light_count > 0:
-                self.status_label.set_text(f"Connected - {status.light_count} light(s) found")
+                ent_status = " (Entertainment: Connected)" if status.entertainment_connected else ""
+                self.status_label.set_text(f"Connected - {status.light_count} light(s) found{ent_status}")
             else:
                 self.status_label.set_text("Connected - No lights found")
             self.start_btn.set_sensitive(True)
@@ -205,15 +206,22 @@ class MainWindow(Gtk.ApplicationWindow):
             return
             
         if not self.sync_controller.is_running():
+            # Connect entertainment streaming first
+            if not self.app_context.start_entertainment():
+                self.status_label.set_text("Failed to connect entertainment streaming - check client_key and entertainment zone")
+                return
+            
             self.sync_controller.start()
             self.start_btn.set_sensitive(False)
             self.stop_btn.set_sensitive(True)
-            self.status_label.set_text("Starting sync...")
+            self.status_label.set_text("Starting sync (Entertainment streaming)...")
 
     def _on_stop_clicked(self, button):
         """Stop sync."""
         if self.sync_controller.is_running():
             self.sync_controller.stop()
+            # Disconnect entertainment streaming
+            self.app_context.stop_entertainment()
             self.start_btn.set_sensitive(True)
             self.stop_btn.set_sensitive(False)
             self.status_label.set_text("Stopping sync...")

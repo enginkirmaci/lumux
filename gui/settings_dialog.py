@@ -86,6 +86,19 @@ class SettingsDialog(Gtk.Dialog):
         key_box.append(self.key_entry)
         frame_box.append(key_box)
 
+        client_key_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        client_key_label = Gtk.Label(label="Client Key:")
+        client_key_label.set_size_request(100, -1)
+        client_key_label.set_xalign(0)
+        self.client_key_entry = Gtk.Entry(text=self.settings.hue.client_key)
+        self.client_key_entry.set_visibility(False)
+        self.client_key_entry.set_hexpand(True)
+        self.client_key_entry.set_size_request(300, -1)
+        self.client_key_entry.set_placeholder_text("Required for entertainment streaming")
+        client_key_box.append(client_key_label)
+        client_key_box.append(self.client_key_entry)
+        frame_box.append(client_key_box)
+
         button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
         discover_btn = Gtk.Button(label="Discover Bridges")
         discover_btn.connect("clicked", self._on_discover)
@@ -96,6 +109,35 @@ class SettingsDialog(Gtk.Dialog):
         frame_box.append(button_box)
 
         box.append(frame)
+
+        # Entertainment zone selection
+        ent_frame = Gtk.Frame(label="Entertainment Zone")
+        ent_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
+        ent_box.set_margin_top(10)
+        ent_box.set_margin_bottom(10)
+        ent_box.set_margin_start(10)
+        ent_box.set_margin_end(10)
+        ent_frame.set_child(ent_box)
+
+        ent_config_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
+        ent_config_label = Gtk.Label(label="Entertainment Zone:")
+        ent_config_label.set_size_request(130, -1)
+        ent_config_label.set_xalign(0)
+        self.ent_config_combo = Gtk.ComboBoxText()
+        self.ent_config_combo.set_hexpand(True)
+        ent_config_box.append(ent_config_label)
+        ent_config_box.append(self.ent_config_combo)
+        ent_box.append(ent_config_box)
+
+        refresh_ent_btn = Gtk.Button(label="Refresh Entertainment Zones")
+        refresh_ent_btn.connect("clicked", self._on_refresh_entertainment_configs)
+        ent_box.append(refresh_ent_btn)
+
+        box.append(ent_frame)
+
+        # Store entertainment configs list
+        self._entertainment_configs = []
+        self._load_entertainment_configs()
 
         status_frame = Gtk.Frame(label="Connection Status")
         status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
@@ -326,14 +368,19 @@ class SettingsDialog(Gtk.Dialog):
 
         self.bridge_status_label.set_text("Press link button on bridge...")
 
-        app_key = self.bridge.create_user(ip)
+        result = self.bridge.create_user(ip)
         
-        if app_key:
+        if result:
+            app_key = result.get('app_key', '')
+            client_key = result.get('client_key', '')
             self.key_entry.set_text(app_key)
+            self.client_key_entry.set_text(client_key)
             # Connect to bridge with new credentials
             if self.bridge.connect():
                 self.bridge_status_label.set_text("Authenticated and connected!")
                 self._update_bridge_status()
+                # Refresh entertainment configs after authentication
+                self._load_entertainment_configs()
             else:
                 self.bridge_status_label.set_text("Authenticated but connection failed")
         else:
@@ -349,11 +396,49 @@ class SettingsDialog(Gtk.Dialog):
             self.bridge_status_label.set_text("Not connected")
             self.lights_label.set_text("Lights: 0")
 
+    def _load_entertainment_configs(self):
+        """Load entertainment configurations from bridge."""
+        self.ent_config_combo.remove_all()
+        self._entertainment_configs = []
+        
+        if not self.bridge.test_connection():
+            self.ent_config_combo.append("", "(Connect to bridge first)")
+            self.ent_config_combo.set_active(0)
+            return
+        
+        configs = self.bridge.get_entertainment_configurations()
+        self._entertainment_configs = configs
+        
+        if not configs:
+            self.ent_config_combo.append("", "(No entertainment zones found)")
+            self.ent_config_combo.set_active(0)
+            return
+        
+        current_id = self.settings.hue.entertainment_config_id
+        selected_idx = 0
+        
+        for i, config in enumerate(configs):
+            config_id = config.get('id', '')
+            name = config.get('name', 'Unknown')
+            channels = len(config.get('channels', []))
+            label = f"{name} ({channels} channels)"
+            self.ent_config_combo.append(config_id, label)
+            if config_id == current_id:
+                selected_idx = i
+        
+        self.ent_config_combo.set_active(selected_idx)
+
+    def _on_refresh_entertainment_configs(self, button):
+        """Refresh entertainment configuration list."""
+        self._load_entertainment_configs()
+
     def _on_response(self, dialog, response):
         """Handle dialog response."""
         if response == Gtk.ResponseType.OK:
             self.settings.hue.bridge_ip = self.ip_entry.get_text()
             self.settings.hue.app_key = self.key_entry.get_text()
+            self.settings.hue.client_key = self.client_key_entry.get_text()
+            self.settings.hue.entertainment_config_id = self.ent_config_combo.get_active_id() or ""
             self.settings.capture.scale_factor = self.scale_adj.get_value()
             self.settings.zones.layout = self.layout_combo.get_active_id()
             self.settings.zones.grid_rows = int(self.rows_adj.get_value())

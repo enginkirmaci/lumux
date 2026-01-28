@@ -11,6 +11,8 @@ from config.zone_mapping import ZoneMapping
 class HueSettings:
     bridge_ip: str = ""
     app_key: str = ""
+    client_key: str = ""  # PSK for DTLS entertainment streaming
+    entertainment_config_id: str = ""  # Selected entertainment zone
     auto_discover: bool = True
 
 

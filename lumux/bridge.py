@@ -3,7 +3,12 @@
 import socket
 import time
 from typing import Dict, List, Optional
+from datetime import datetime
 
+
+def _timed_print(*args, **kwargs):
+    prefix = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
+    print(prefix, *args, **kwargs)
 from python_hue_v2 import Hue
 
 
@@ -33,10 +38,11 @@ class HueBridge:
             print(f"Error connecting to bridge: {e}")
             return False
 
-    def create_user(self, bridge_ip: str, application_name: str = "lumux") -> Optional[str]:
+    def create_user(self, bridge_ip: str, application_name: str = "lumux") -> Optional[dict]:
         """Create a new user/app key on the bridge.
 
         User must press the link button on the bridge before calling this.
+        Returns dict with 'app_key' and 'client_key' on success, None on failure.
         """
         try:
             import requests
@@ -54,9 +60,10 @@ class HueBridge:
                 if result and len(result) > 0:
                     if 'success' in result[0]:
                         app_key = result[0]['success']['username']
+                        client_key = result[0]['success'].get('clientkey', '')
                         self.app_key = app_key
                         self.bridge_ip = bridge_ip
-                        return app_key
+                        return {'app_key': app_key, 'client_key': client_key}
                     elif 'error' in result[0]:
                         error_msg = result[0]['error'].get('description', 'Unknown error')
                         print(f"Bridge error: {error_msg}")
@@ -197,6 +204,8 @@ class HueBridge:
             # If it's a gradient light, we might still want to set a single color occasionally,
             # but usually we use set_light_gradient.
             self.bridge._put_by_id('light', light_id, payload)
+            _timed_print(f"Set light {light_id} color to xy={xy}, brightness={brightness}")
+
         except Exception as e:
             print(f"Error setting light color: {e}")
 
@@ -237,6 +246,7 @@ class HueBridge:
                 payload['dynamics'] = {'duration': int(max(0, transition_time))}
 
             self.bridge._put_by_id('light', light_id, payload)
+            _timed_print(f"Set light {light_id} gradient with {len(points)} points, brightness={brightness}")
         except Exception as e:
             print(f"Error setting light gradient: {e}")
 
@@ -331,4 +341,99 @@ class HueBridge:
             self.bridge.get_lights()
             return True
         except Exception:
+            return False
+
+    def get_entertainment_configurations(self) -> List[dict]:
+        """Fetch all entertainment configurations from the bridge.
+        
+        Returns list of entertainment configs with id, name, channels, etc.
+        """
+        if not self.bridge_ip or not self.app_key:
+            return []
+        
+        import requests
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
+        headers = {"hue-application-key": self.app_key}
+        url = f"https://{self.bridge_ip}/clip/v2/resource/entertainment_configuration"
+        
+        try:
+            resp = requests.get(url, headers=headers, verify=False, timeout=5)
+            data = resp.json().get('data', [])
+            
+            configs = []
+            for config in data:
+                configs.append({
+                    'id': config.get('id'),
+                    'name': config.get('metadata', {}).get('name', 'Unknown'),
+                    'status': config.get('status'),
+                    'configuration_type': config.get('configuration_type'),
+                    'channels': config.get('channels', []),
+                    'locations': config.get('locations', {})
+                })
+            return configs
+        except Exception as e:
+            print(f"Error fetching entertainment configurations: {e}")
+            return []
+
+    def get_entertainment_configuration(self, config_id: str) -> Optional[dict]:
+        """Fetch a specific entertainment configuration by ID."""
+        configs = self.get_entertainment_configurations()
+        for config in configs:
+            if config['id'] == config_id:
+                return config
+        return None
+
+    def activate_entertainment_streaming(self, config_id: str) -> bool:
+        """Activate entertainment streaming for a configuration.
+        
+        PUT action: start to claim ownership of the entertainment zone.
+        """
+        if not self.bridge_ip or not self.app_key:
+            return False
+        
+        import requests
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
+        headers = {"hue-application-key": self.app_key}
+        url = f"https://{self.bridge_ip}/clip/v2/resource/entertainment_configuration/{config_id}"
+        payload = {"action": "start"}
+        
+        try:
+            resp = requests.put(url, headers=headers, json=payload, verify=False, timeout=5)
+            if resp.status_code == 200:
+                _timed_print(f"Entertainment streaming activated for config {config_id}")
+                return True
+            else:
+                print(f"Failed to activate streaming: {resp.status_code} - {resp.text}")
+                return False
+        except Exception as e:
+            print(f"Error activating entertainment streaming: {e}")
+            return False
+
+    def deactivate_entertainment_streaming(self, config_id: str) -> bool:
+        """Deactivate entertainment streaming for a configuration."""
+        if not self.bridge_ip or not self.app_key:
+            return False
+        
+        import requests
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+        
+        headers = {"hue-application-key": self.app_key}
+        url = f"https://{self.bridge_ip}/clip/v2/resource/entertainment_configuration/{config_id}"
+        payload = {"action": "stop"}
+        
+        try:
+            resp = requests.put(url, headers=headers, json=payload, verify=False, timeout=5)
+            if resp.status_code == 200:
+                _timed_print(f"Entertainment streaming deactivated for config {config_id}")
+                return True
+            else:
+                print(f"Failed to deactivate streaming: {resp.status_code} - {resp.text}")
+                return False
+        except Exception as e:
+            print(f"Error deactivating entertainment streaming: {e}")
             return False

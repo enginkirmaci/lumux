@@ -2,6 +2,8 @@
   "hue": {
     "bridge_ip": "",
     "app_key": "",
+    "client_key": "",
+    "entertainment_config_id": "",
     "auto_discover": true
   },
   "capture": {

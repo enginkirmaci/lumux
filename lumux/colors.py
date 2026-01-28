@@ -34,11 +34,15 @@ class ColorAnalyzer:
     def _calculate_brightness(self, rgb: Tuple[int, int, int]) -> int:
         """Calculate brightness (0-254) from RGB.
 
-        Uses luminance formula: 0.2126*R + 0.7152*G + 0.0722*B
+        Uses max RGB component to ensure uniform brightness across all colors.
+        This prevents blue and purple from appearing dimmer than other colors,
+        since the luminance formula heavily weights green (71.5%) while blue
+        only contributes 7.2%.
         """
         r, g, b = rgb
-        luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b
-        brightness = int((luminance / 255.0) * 254.0 * self.brightness_scale)
+        # Use max component for consistent brightness across all hues
+        max_component = max(r, g, b)
+        brightness = int((max_component / 255.0) * 254.0 * self.brightness_scale)
         return max(1, min(254, brightness))
 
     def _apply_gamma(self, rgb: Tuple[int, int, int]) -> Tuple[int, int, int]:

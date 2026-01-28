@@ -8,22 +8,33 @@ optional parameters for compatibility but ignores them.
 from typing import Tuple, Optional
 
 
-def rgb_to_xy(r: int, g: int, b: int, light_info: Optional[dict] = None, gamut: Optional[dict] = None) -> Tuple[float, float]:
-    """Convert RGB (0-255) to XY coordinates using a linear RGB assumption.
-
-    Note: This version does not apply gamma correction. If `gamut` or
-    `light_info` provides gamut points, the result is constrained to the
-    triangle defined by the light's RGB gamut.
+def _srgb_to_linear(value: float) -> float:
+    """Convert sRGB component to linear RGB using proper gamma correction.
+    
+    sRGB uses a piecewise function: linear for small values, 
+    gamma ~2.4 for larger values.
     """
-    # Normalize RGB to 0-1 range (no gamma correction)
-    r_norm = r / 255.0
-    g_norm = g / 255.0
-    b_norm = b / 255.0
+    if value <= 0.04045:
+        return value / 12.92
+    return ((value + 0.055) / 1.055) ** 2.4
 
-    # Convert to XYZ using sRGB matrix (linear RGB)
-    X = r_norm * 0.664511 + g_norm * 0.154324 + b_norm * 0.162028
-    Y = r_norm * 0.283881 + g_norm * 0.668433 + b_norm * 0.047685
-    Z = r_norm * 0.000088 + g_norm * 0.072310 + b_norm * 0.986039
+
+def rgb_to_xy(r: int, g: int, b: int, light_info: Optional[dict] = None, gamut: Optional[dict] = None) -> Tuple[float, float]:
+    """Convert RGB (0-255) to XY coordinates with proper sRGB gamma correction.
+
+    Applies sRGB linearization before XYZ conversion for accurate colors.
+    If `gamut` or `light_info` provides gamut points, the result is 
+    constrained to the triangle defined by the light's RGB gamut.
+    """
+    # Normalize RGB to 0-1 range and apply sRGB gamma correction
+    r_norm = _srgb_to_linear(r / 255.0)
+    g_norm = _srgb_to_linear(g / 255.0)
+    b_norm = _srgb_to_linear(b / 255.0)
+
+    # Convert to XYZ using Wide RGB D65 matrix (optimized for Hue)
+    X = r_norm * 0.4124564 + g_norm * 0.3575761 + b_norm * 0.1804375
+    Y = r_norm * 0.2126729 + g_norm * 0.7151522 + b_norm * 0.0721750
+    Z = r_norm * 0.0193339 + g_norm * 0.1191920 + b_norm * 0.9503041
 
     total = X + Y + Z
     if total == 0:

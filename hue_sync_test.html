@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hue Sync Test - Color Spinning</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; }
+        body {
+            /* Fallback background in case the wheel doesn't cover corners */
+            background: #ff0000;
+            color: #fff;
+            font-family: Arial, Helvetica, sans-serif;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        /* Stage centers the wheel and provides side-to-side motion */
+        .stage {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        /* Keep centering separate from rotation (so animation doesn't override translate) */
+        .wheel-wrap {
+            /* Use vmax so the circle covers the full diagonal on ultrawide screens */
+            width: 200vmax;
+            height: 200vmax;
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Wheel rotates continuously (large so wedges fill the screen) */
+        .wheel {
+            width: 100%;
+            height: 100%;
+            border-radius: 50%;
+            filter: drop-shadow(0 10px 30px rgba(0,0,0,0.6));
+            animation: spin 30s linear infinite;
+            will-change: transform;
+            /* Explicit stops reduce hairline seams between wedges on some GPUs */
+            background: conic-gradient(
+                from -90deg,
+                #ff0000 0deg 45deg,
+                #ff7f00 45deg 90deg,
+                #ffff00 90deg 135deg,
+                #00ff00 135deg 180deg,
+                #00bcd4 180deg 225deg,
+                #0000ff 225deg 270deg,
+                #4b0082 270deg 315deg,
+                #9400d3 315deg 360deg
+            );
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+        @media (max-width: 600px) {
+            .wheel-wrap { width: 200vmax; height: 200vmax; }
+        }
+    </style>
+</head>
+    <body>
+        <div class="stage">
+            <div class="wheel-wrap">
+                <div class="wheel"></div>
+            </div>
+        </div>
+    </body>
+</html>

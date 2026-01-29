@@ -29,11 +29,7 @@ class AppContext:
         self.capture = ScreenCapture(
             scale_factor=settings.capture.scale_factor,
         )
-        self.zone_processor = ZoneProcessor(
-            layout=settings.zones.layout,
-            rows=settings.zones.grid_rows,
-            cols=settings.zones.grid_cols
-        )
+        self.zone_processor = ZoneProcessor(settings=settings.zones)
         self.color_analyzer = ColorAnalyzer(
             brightness_scale=settings.sync.brightness_scale,
             gamma=settings.sync.gamma
@@ -101,14 +97,18 @@ class AppContext:
         capture = self.settings.capture
         self.capture.scale_factor = capture.scale_factor
 
-        zones = self.settings.zones
-        self.zone_processor.layout = zones.layout
-        self.zone_processor.rows = zones.grid_rows
-        self.zone_processor.cols = zones.grid_cols
-        self.zone_mapping.layout = zones.layout
-
         self.color_analyzer.brightness_scale = self.settings.sync.brightness_scale
         self.color_analyzer.gamma = self.settings.sync.gamma
+
+        # Apply zone layout settings to the zone processor
+        try:
+            self.zone_processor.rows = int(self.settings.zones.rows)
+        except Exception:
+            self.zone_processor.rows = 16
+        try:
+            self.zone_processor.cols = int(self.settings.zones.cols)
+        except Exception:
+            self.zone_processor.cols = 16
 
         # Recreate entertainment stream if settings changed
         if hue.client_key and hue.entertainment_config_id:

@@ -8,13 +8,11 @@ from typing import Dict, List, Optional
 class ZoneMapping:
     def __init__(self):
         self.mapping: Dict[str, List[str]] = {}
-        self.layout = "ambilight"
                 
         self._set_default_mapping()
 
     def _set_default_mapping(self):
         """Set default zone mappings for ambilight layout."""
-        self.layout = "ambilight"
         self.mapping = {
             'top_0': [],
             'top_1': [],
@@ -40,24 +38,6 @@ class ZoneMapping:
         """Get all zone IDs."""
         return list(self.mapping.keys())
 
-    def generate_grid_mapping(self, available_lights: List[str], rows: int, cols: int):
-        """Auto-generate grid zone mapping using actual light IDs."""
-        self.layout = "grid"
-        self.mapping = {}
-        
-        total_zones = rows * cols
-        if not available_lights:
-            return
-
-        # Initialize zones
-        for i in range(total_zones):
-            self.mapping[str(i)] = []
-
-        # Distribute lights evenly across the grid
-        for i, light_id in enumerate(available_lights):
-            zone_idx = int((i + 0.5) * total_zones / len(available_lights))
-            self.mapping[str(zone_idx)].append(light_id)
-
     def generate_ambilight_mapping(self, available_lights: List[str],
                                     light_info: Optional[Dict[str, dict]] = None,
                                     top_count: int = 3,
@@ -69,7 +49,6 @@ class ZoneMapping:
         Uses light archetype and names to intelligently place lightstrips on the 
         top and play bars on the sides.
         """
-        self.layout = "ambilight"
         self.mapping = {}
 
         # Initialize all potential zones

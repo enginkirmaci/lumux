@@ -10,9 +10,9 @@
     "scale_factor": 0.125
   },
   "zones": {
-    "layout": "ambilight",
-    "grid_rows": 16,
-    "grid_cols": 16
+    "show_preview": true,
+    "rows": 16,
+    "cols": 16
   },
   "sync": {
     "fps": 30,

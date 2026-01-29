@@ -198,15 +198,10 @@ class MainWindow(Adw.ApplicationWindow):
         preview_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
         preview_card.add_css_class("preview-card")
         
-        self.zone_preview = ZonePreviewWidget(
-            rows=self.settings.zones.grid_rows,
-            cols=self.settings.zones.grid_cols
-        )
-        self.zone_preview.set_layout(
-            self.settings.zones.layout,
-            self.settings.zones.grid_rows,
-            self.settings.zones.grid_cols
-        )
+        # Initialize preview with configured layout
+        self.zone_preview = ZonePreviewWidget(rows=self.settings.zones.rows,
+                              cols=self.settings.zones.cols)
+        self.zone_preview.set_layout(self.settings.zones.rows, self.settings.zones.cols)
         self.zone_preview.set_size_request(-1, 250)
         preview_card.append(self.zone_preview)
         
@@ -426,11 +421,7 @@ class MainWindow(Adw.ApplicationWindow):
         
         # Update preview visibility and layout
         self.preview_group.set_visible(self.settings.zones.show_preview)
-        self.zone_preview.set_layout(
-            self.settings.zones.layout,
-            self.settings.zones.grid_rows,
-            self.settings.zones.grid_cols
-        )
+        self.zone_preview.set_layout(self.settings.zones.rows, self.settings.zones.cols)
 
         # Apply window sizing centrally
         self._apply_window_size()

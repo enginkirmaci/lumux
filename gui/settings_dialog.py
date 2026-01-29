@@ -140,32 +140,8 @@ class SettingsDialog(Adw.PreferencesDialog):
 
         zones_group = Adw.PreferencesGroup()
         zones_group.set_title("Zone Configuration")
-        zones_group.set_description("Configure how the screen is divided into zones")
+        zones_group.set_description("Ambilight captures colors from screen edges")
         zones_page.add(zones_group)
-
-        # Layout combo
-        self.layout_row = Adw.ComboRow()
-        self.layout_row.set_title("Zone Layout")
-        self.layout_row.set_subtitle("How zones are arranged on screen")
-        layout_model = Gtk.StringList.new(["Ambilight", "Grid"])
-        self.layout_row.set_model(layout_model)
-        current_layout = 0 if self.settings.zones.layout.lower() == "ambilight" else 1
-        self.layout_row.set_selected(current_layout)
-        zones_group.add(self.layout_row)
-
-        # Grid rows
-        self.rows_row = Adw.SpinRow.new_with_range(1, 64, 1)
-        self.rows_row.set_title("Grid Rows")
-        self.rows_row.set_subtitle("Number of horizontal zones")
-        self.rows_row.set_value(self.settings.zones.grid_rows)
-        zones_group.add(self.rows_row)
-
-        # Grid columns
-        self.cols_row = Adw.SpinRow.new_with_range(1, 64, 1)
-        self.cols_row.set_title("Grid Columns")
-        self.cols_row.set_subtitle("Number of vertical zones")
-        self.cols_row.set_value(self.settings.zones.grid_cols)
-        zones_group.add(self.cols_row)
 
         # Preview toggle
         self.preview_row = Adw.SwitchRow()
@@ -173,6 +149,21 @@ class SettingsDialog(Adw.PreferencesDialog):
         self.preview_row.set_subtitle("Display real-time zone visualization")
         self.preview_row.set_active(self.settings.zones.show_preview)
         zones_group.add(self.preview_row)
+
+        # Zone grid size (rows / columns)
+        self.rows_row = Adw.SpinRow.new_with_range(1, 64, 1)
+        self.rows_row.set_title("Edge Rows")
+        self.rows_row.set_subtitle("Number of zones along left/right edges")
+        self.rows_row.set_digits(0)
+        self.rows_row.set_value(self.settings.zones.rows)
+        zones_group.add(self.rows_row)
+
+        self.cols_row = Adw.SpinRow.new_with_range(1, 64, 1)
+        self.cols_row.set_title("Edge Columns")
+        self.cols_row.set_subtitle("Number of zones along top/bottom edges")
+        self.cols_row.set_digits(0)
+        self.cols_row.set_value(self.settings.zones.cols)
+        zones_group.add(self.cols_row)
 
         # Sync page
         sync_page = Adw.PreferencesPage()
@@ -340,12 +331,17 @@ class SettingsDialog(Adw.PreferencesDialog):
         
         self.settings.capture.scale_factor = self.scale_row.get_value()
         
-        # Zone layout
-        layout_selected = self.layout_row.get_selected()
-        self.settings.zones.layout = "ambilight" if layout_selected == 0 else "grid"
-        self.settings.zones.grid_rows = int(self.rows_row.get_value())
-        self.settings.zones.grid_cols = int(self.cols_row.get_value())
+        # Zone settings
         self.settings.zones.show_preview = self.preview_row.get_active()
+        # Grid size
+        try:
+            self.settings.zones.rows = int(self.rows_row.get_value())
+        except Exception:
+            self.settings.zones.rows = 16
+        try:
+            self.settings.zones.cols = int(self.cols_row.get_value())
+        except Exception:
+            self.settings.zones.cols = 16
         
         # Sync settings
         self.settings.sync.fps = int(self.fps_row.get_value())

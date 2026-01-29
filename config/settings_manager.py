@@ -23,10 +23,9 @@ class CaptureSettings:
 
 @dataclass
 class ZoneSettings:
-    layout: str = "ambilight"
-    grid_rows: int = 16
-    grid_cols: int = 16
     show_preview: bool = True
+    rows: int = 16
+    cols: int = 16
 
 
 @dataclass
@@ -130,17 +129,23 @@ class SettingsManager:
     def _validate_settings(self):
         """Validate and clamp settings to valid ranges."""
         self._settings.capture.scale_factor = max(0.01, min(1.0, self._settings.capture.scale_factor))
-        self._settings.zones.grid_rows = max(1, min(64, self._settings.zones.grid_rows))
-        self._settings.zones.grid_cols = max(1, min(64, self._settings.zones.grid_cols))
         self._settings.sync.fps = max(1, min(60, self._settings.sync.fps))
         self._settings.sync.transition_time_ms = max(0, min(10000, self._settings.sync.transition_time_ms))
         self._settings.sync.brightness_scale = max(0.0, min(2.0, self._settings.sync.brightness_scale))
         self._settings.sync.gamma = max(0.1, min(3.0, self._settings.sync.gamma))
         self._settings.sync.smoothing_factor = max(0.0, min(1.0, self._settings.sync.smoothing_factor))
+        # Zone grid size bounds
+        try:
+            self._settings.zones.rows = int(self._settings.zones.rows)
+        except Exception:
+            self._settings.zones.rows = 16
+        try:
+            self._settings.zones.cols = int(self._settings.zones.cols)
+        except Exception:
+            self._settings.zones.cols = 16
 
-        self._settings.zones.layout = self._settings.zones.layout.lower()
-        if self._settings.zones.layout not in ['ambilight', 'grid']:
-            self._settings.zones.layout = 'ambilight'
+        self._settings.zones.rows = max(1, min(64, self._settings.zones.rows))
+        self._settings.zones.cols = max(1, min(64, self._settings.zones.cols))
 
     def _ensure_config_dir(self):
         """Ensure config directory exists."""

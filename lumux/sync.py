@@ -80,21 +80,16 @@ class SyncController:
             _timed_print("Warning: No channel positions available")
             return
 
-        # Get all zone IDs that will be used
-        # For ambilight: top_0..top_n, left_0..left_n, right_0..right_n, bottom_0..bottom_n
-        if self.zone_processor.layout == "ambilight":
-            zones = []
-            for edge in ['top', 'bottom', 'left', 'right']:
-                if edge in ['top', 'bottom']:
-                    count = self.zone_processor.cols
-                else:
-                    count = max(1, self.zone_processor.rows // 2)
-                for i in range(count):
-                    zones.append(f"{edge}_{i}")
-        else:
-            # Grid layout
-            zones = [f"{r}_{c}" for r in range(self.zone_processor.rows) 
-                     for c in range(self.zone_processor.cols)]
+        # Get all zone IDs for ambilight layout
+        # top_0..top_n, left_0..left_n, right_0..right_n, bottom_0..bottom_n
+        zones = []
+        for edge in ['top', 'bottom', 'left', 'right']:
+            if edge in ['top', 'bottom']:
+                count = self.zone_processor.cols
+            else:
+                count = max(1, self.zone_processor.rows // 2)
+            for i in range(count):
+                zones.append(f"{edge}_{i}")
 
         # Map each zone to nearest channel based on position
         for zone_id in zones:

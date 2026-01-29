@@ -15,7 +15,6 @@ class ZonePreviewWidget(Gtk.DrawingArea):
         super().__init__()
         self.rows = rows
         self.cols = cols
-        self.layout = "grid"
         self.zone_colors: dict = {}
         self.zone_ids: list[str] = []
         self._corner_radius = 12
@@ -25,15 +24,13 @@ class ZonePreviewWidget(Gtk.DrawingArea):
         self.set_size_request(400, 300)
         self.set_draw_func(self._draw)
 
-    def set_layout(self, layout: str, rows: int = 16, cols: int = 16):
+    def set_layout(self, rows: int = 16, cols: int = 16):
         """Update zone layout.
 
         Args:
-            layout: 'grid' or 'ambilight'
-            rows: Number of rows for grid layout
-            cols: Number of columns for grid/ambilight layout
+            rows: Number of rows for ambilight layout
+            cols: Number of columns for ambilight layout
         """
-        self.layout = layout.lower()
         self.rows = rows
         self.cols = cols
         self.zone_ids = self._generate_zone_ids()
@@ -41,20 +38,17 @@ class ZonePreviewWidget(Gtk.DrawingArea):
         self.queue_draw()
 
     def _generate_zone_ids(self) -> list[str]:
-        """Generate zone IDs based on current layout."""
-        if self.layout == "ambilight":
-            zones = []
-            for i in range(self.cols):
-                zones.append(f"top_{i}")
-            for i in range(self.cols):
-                zones.append(f"bottom_{i}")
-            for i in range(self.rows):
-                zones.append(f"left_{i}")
-            for i in range(self.rows):
-                zones.append(f"right_{i}")
-            return zones
-        else:
-            return [str(i) for i in range(self.rows * self.cols)]
+        """Generate zone IDs for ambilight layout."""
+        zones = []
+        for i in range(self.cols):
+            zones.append(f"top_{i}")
+        for i in range(self.cols):
+            zones.append(f"bottom_{i}")
+        for i in range(self.rows):
+            zones.append(f"left_{i}")
+        for i in range(self.rows):
+            zones.append(f"right_{i}")
+        return zones
 
     def update_colors(self, zone_colors: dict):
         """Update zone colors and redraw.
@@ -72,10 +66,7 @@ class ZonePreviewWidget(Gtk.DrawingArea):
         ctx.set_source_rgb(0.08, 0.08, 0.08)
         ctx.fill()
         
-        if self.layout == "ambilight":
-            self._draw_ambilight(ctx, width, height)
-        else:
-            self._draw_grid(ctx, width, height)
+        self._draw_ambilight(ctx, width, height)
 
     def _draw_rounded_rect(self, ctx, x, y, width, height, radius):
         """Draw a rounded rectangle path."""
@@ -119,25 +110,6 @@ class ZonePreviewWidget(Gtk.DrawingArea):
         self._draw_rounded_rect(ctx, x, y, w, h, corner_radius)
         ctx.set_line_width(0.5)
         ctx.stroke()
-
-    def _draw_grid(self, ctx, width, height):
-        """Draw standard grid layout with modern styling."""
-        padding = 8
-        inner_width = width - 2 * padding
-        inner_height = height - 2 * padding
-        
-        cell_width = (inner_width - (self.cols - 1) * self._cell_gap) / self.cols
-        cell_height = (inner_height - (self.rows - 1) * self._cell_gap) / self.rows
-
-        for row in range(self.rows):
-            for col in range(self.cols):
-                zone_id = str(row * self.cols + col)
-                rgb = self.zone_colors.get(zone_id, (30, 30, 30))
-                
-                x = padding + col * (cell_width + self._cell_gap)
-                y = padding + row * (cell_height + self._cell_gap)
-                
-                self._draw_cell(ctx, x, y, cell_width, cell_height, rgb, corner_radius=4)
 
     def _draw_ambilight(self, ctx, width, height):
         """Draw ambilight layout with modern styling."""

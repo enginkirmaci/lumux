@@ -16,7 +16,8 @@ class BridgeStatus:
     connected: bool
     configured: bool
     bridge_ip: str
-    light_count: int
+    entertainment_zone_name: str = ""
+    entertainment_channel_count: int = 0
     entertainment_connected: bool = False
 
 
@@ -133,7 +134,16 @@ class AppContext:
         if attempt_connect and configured and not connected:
             connected = self.bridge.connect()
 
-        light_count = len(self.bridge.get_light_ids()) if connected else 0
+        entertainment_zone_name = ""
+        entertainment_channel_count = 0
+        if connected and self.settings.hue.entertainment_config_id:
+            configs = self.bridge.get_entertainment_configurations()
+            for config in configs:
+                if config.get('id') == self.settings.hue.entertainment_config_id:
+                    entertainment_zone_name = config.get('name', '')
+                    entertainment_channel_count = len(config.get('channels', []))
+                    break
+        
         entertainment_connected = (self.entertainment_stream is not None and 
                                    self.entertainment_stream.is_connected())
         
@@ -141,6 +151,7 @@ class AppContext:
             connected=connected,
             configured=configured,
             bridge_ip=self.settings.hue.bridge_ip,
-            light_count=light_count,
+            entertainment_zone_name=entertainment_zone_name,
+            entertainment_channel_count=entertainment_channel_count,
             entertainment_connected=entertainment_connected
         )

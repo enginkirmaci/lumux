@@ -1,14 +1,15 @@
-"""Main application window."""
+"""Main application window with modern Adwaita styling."""
 
 import gi
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk, GLib
+gi.require_version("Adw", "1")
+from gi.repository import Gtk, GLib, Adw, Gdk
 from lumux.app_context import AppContext
 from gui.settings_dialog import SettingsDialog
 from gui.zone_preview_widget import ZonePreviewWidget
 
 
-class MainWindow(Gtk.ApplicationWindow):
+class MainWindow(Adw.ApplicationWindow):
     __gtype_name__ = 'LumuxMainWindow'
 
     def __init__(self, app, app_context: AppContext):
@@ -17,62 +18,186 @@ class MainWindow(Gtk.ApplicationWindow):
         self.sync_controller = app_context.sync_controller
         self.settings = app_context.settings
         self.bridge_connected = False
+        self._is_syncing = False
         # Window size presets
         self._preview_size = (900, 700)
-        self._compact_size = (640, 480)
+        self._compact_size = (500, 400)
 
+        self._setup_css()
         self._build_ui()
         self._check_bridge_connection()
         
         self.status_timeout_id = GLib.timeout_add(100, self._update_status)
 
-    def _build_ui(self):
-        """Build main window layout."""
-        self.set_title("Lumux for Philips Hue Sync")
+    def _setup_css(self):
+        """Apply custom CSS styling."""
+        css_provider = Gtk.CssProvider()
+        css_provider.load_from_string("""
+            .status-card {
+                padding: 16px;
+                border-radius: 12px;
+            }
+            .status-connected {
+                background: alpha(@success_color, 0.1);
+                border: 1px solid alpha(@success_color, 0.3);
+            }
+            .status-disconnected {
+                background: alpha(@warning_color, 0.1);
+                border: 1px solid alpha(@warning_color, 0.3);
+            }
+            .status-syncing {
+                background: linear-gradient(135deg, alpha(@accent_color, 0.15), alpha(@purple_3, 0.15));
+                border: 1px solid alpha(@accent_color, 0.4);
+            }
+            .preview-card {
+                background: alpha(@card_bg_color, 0.8);
+                border-radius: 16px;
+                padding: 8px;
+            }
+            .control-button {
+                padding: 12px 32px;
+                border-radius: 24px;
+                font-weight: bold;
+                font-size: 14px;
+            }
+            .stats-label {
+                font-size: 12px;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+                opacity: 0.7;
+            }
+            .stats-value {
+                font-size: 24px;
+                font-weight: 700;
+            }
+            .info-banner {
+                background: alpha(@accent_color, 0.1);
+                border-radius: 8px;
+                padding: 12px 16px;
+            }
+            .main-title {
+                font-size: 13px;
+                font-weight: 600;
+                letter-spacing: 0.5px;
+                opacity: 0.6;
+            }
+        """)
+        Gtk.StyleContext.add_provider_for_display(
+            Gdk.Display.get_default(),
+            css_provider,
+            Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION
+        )
 
-        header = Gtk.HeaderBar()
-        settings_btn = Gtk.Button(label="Settings")
+    def _build_ui(self):
+        """Build main window layout with modern Adwaita design."""
+        self.set_title("Lumux")
+
+        # Header bar with modern styling
+        header = Adw.HeaderBar()
+        header.set_centering_policy(Adw.CenteringPolicy.STRICT)
+        
+        # Settings button with icon
+        settings_btn = Gtk.Button()
+        settings_btn.set_icon_name("emblem-system-symbolic")
+        settings_btn.set_tooltip_text("Settings")
+        settings_btn.add_css_class("flat")
         settings_btn.connect("clicked", self._on_settings_clicked)
         header.pack_end(settings_btn)
-        self.set_titlebar(header)
+        
+        # About button
+        about_btn = Gtk.Button()
+        about_btn.set_icon_name("help-about-symbolic")
+        about_btn.set_tooltip_text("About Lumux")
+        about_btn.add_css_class("flat")
+        about_btn.connect("clicked", self._on_about_clicked)
+        header.pack_end(about_btn)
 
-        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        main_box.set_margin_top(20)
-        main_box.set_margin_bottom(20)
-        main_box.set_margin_start(20)
-        main_box.set_margin_end(20)
-        self.set_child(main_box)
+        # Main content with toolbar view
+        toolbar_view = Adw.ToolbarView()
+        toolbar_view.add_top_bar(header)
+        self.set_content(toolbar_view)
 
-        status_frame = Gtk.Frame(label="Status")
-        status_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=5)
-        status_box.set_margin_top(10)
-        status_box.set_margin_bottom(10)
-        status_box.set_margin_start(10)
-        status_box.set_margin_end(10)
-        status_frame.set_child(status_box)
+        # Scrollable content
+        scrolled = Gtk.ScrolledWindow()
+        scrolled.set_policy(Gtk.PolicyType.NEVER, Gtk.PolicyType.AUTOMATIC)
+        toolbar_view.set_content(scrolled)
 
+        # Main clamp for content width
+        clamp = Adw.Clamp()
+        clamp.set_maximum_size(800)
+        clamp.set_tightening_threshold(600)
+        scrolled.set_child(clamp)
+
+        main_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=24)
+        main_box.set_margin_top(24)
+        main_box.set_margin_bottom(24)
+        main_box.set_margin_start(24)
+        main_box.set_margin_end(24)
+        clamp.set_child(main_box)
+
+        # Status card
+        self.status_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        self.status_card.add_css_class("status-card")
+        self.status_card.add_css_class("status-disconnected")
+        
+        # Status header with icon
+        status_header = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self.status_icon = Gtk.Image.new_from_icon_name("network-offline-symbolic")
+        self.status_icon.set_pixel_size(24)
+        status_header.append(self.status_icon)
+        
+        status_text_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
         self.status_label = Gtk.Label(label="Ready")
         self.status_label.set_xalign(0)
-        status_box.append(self.status_label)
+        self.status_label.add_css_class("title-3")
+        status_text_box.append(self.status_label)
+        
+        self.status_subtitle = Gtk.Label(label="Connect to your Hue bridge to get started")
+        self.status_subtitle.set_xalign(0)
+        self.status_subtitle.add_css_class("dim-label")
+        status_text_box.append(self.status_subtitle)
+        status_text_box.set_hexpand(True)
+        status_header.append(status_text_box)
 
-        self.fps_label = Gtk.Label(label="FPS: 0")
-        self.fps_label.set_xalign(0)
-        status_box.append(self.fps_label)
+        # Stats box (placed to the right in the header)
+        self.stats_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=16)
+        self.stats_box.set_halign(Gtk.Align.END)
+        self.stats_box.set_valign(Gtk.Align.CENTER)
+        self.stats_box.set_visible(False)
 
-        self.frames_label = Gtk.Label(label="Frames: 0")
-        self.frames_label.set_xalign(0)
-        status_box.append(self.frames_label)
+        # FPS stat
+        fps_stat = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        fps_label = Gtk.Label(label="FPS")
+        fps_label.add_css_class("stats-label")
+        fps_stat.append(fps_label)
+        self.fps_value = Gtk.Label(label="0")
+        self.fps_value.add_css_class("stats-value")
+        fps_stat.append(self.fps_value)
+        self.stats_box.append(fps_stat)
 
-        main_box.append(status_frame)
+        # Frames stat
+        frames_stat = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
+        frames_label = Gtk.Label(label="FRAMES")
+        frames_label.add_css_class("stats-label")
+        frames_stat.append(frames_label)
+        self.frames_value = Gtk.Label(label="0")
+        self.frames_value.add_css_class("stats-value")
+        frames_stat.append(self.frames_value)
+        self.stats_box.append(frames_stat)
 
-        self.preview_frame = Gtk.Frame(label="Zone Preview")
-        preview_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
-        preview_box.set_margin_top(10)
-        preview_box.set_margin_bottom(10)
-        preview_box.set_margin_start(10)
-        preview_box.set_margin_end(10)
-        self.preview_frame.set_child(preview_box)
+        # Add stats box into the header so it appears to the right
+        status_header.append(self.stats_box)
+        self.status_card.append(status_header)
+        main_box.append(self.status_card)
 
+        # Zone preview section
+        self.preview_group = Adw.PreferencesGroup()
+        self.preview_group.set_title("Zone Preview")
+        self.preview_group.set_description("Real-time visualization of screen zones")
+        
+        preview_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL)
+        preview_card.add_css_class("preview-card")
+        
         self.zone_preview = ZonePreviewWidget(
             rows=self.settings.zones.grid_rows,
             cols=self.settings.zones.grid_cols
@@ -82,47 +207,96 @@ class MainWindow(Gtk.ApplicationWindow):
             self.settings.zones.grid_rows,
             self.settings.zones.grid_cols
         )
-        preview_box.append(self.zone_preview)
-        # Show or hide the preview based on settings
-        self.preview_frame.set_child(preview_box)
-        self.preview_frame.set_visible(self.settings.zones.show_preview)
-        main_box.append(self.preview_frame)
-
-        control_frame = Gtk.Frame(label="Controls")
-        control_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)
-        control_box.set_margin_top(10)
-        control_box.set_margin_bottom(10)
-        control_box.set_margin_start(10)
-        control_box.set_margin_end(10)
-        control_frame.set_child(control_box)
-
-        btn_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=10)
-        btn_box.set_halign(Gtk.Align.CENTER)
-
-        self.start_btn = Gtk.Button(label="Start Sync")
-        self.start_btn.set_size_request(120, 40)
-        self.start_btn.connect("clicked", self._on_start_clicked)
+        self.zone_preview.set_size_request(-1, 250)
+        preview_card.append(self.zone_preview)
         
-        self.stop_btn = Gtk.Button(label="Stop Sync")
-        self.stop_btn.set_size_request(120, 40)
-        self.stop_btn.set_sensitive(False)
-        self.stop_btn.connect("clicked", self._on_stop_clicked)
+        self.preview_group.add(preview_card)
+        self.preview_group.set_visible(self.settings.zones.show_preview)
+        main_box.append(self.preview_group)
 
-        btn_box.append(self.start_btn)
-        btn_box.append(self.stop_btn)
-        control_box.append(btn_box)
+        # Control section
+        control_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        
+        # Sync toggle button (large, prominent)
+        self.sync_button = Gtk.Button()
+        self.sync_button.add_css_class("control-button")
+        self.sync_button.add_css_class("suggested-action")
+        self.sync_button.add_css_class("pill")
+        self._update_sync_button_state(False)
+        self.sync_button.connect("clicked", self._on_sync_toggle)
+        self.sync_button.set_halign(Gtk.Align.CENTER)
+        self.sync_button.set_size_request(200, 48)
+        control_box.append(self.sync_button)
 
+        # Info banner
+        self.info_banner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        self.info_banner.add_css_class("info-banner")
+        self.info_banner.set_halign(Gtk.Align.CENTER)
+        
+        info_icon = Gtk.Image.new_from_icon_name("dialog-information-symbolic")
+        self.info_banner.append(info_icon)
+        
         self.info_label = Gtk.Label(
             label="Configure your Hue bridge in Settings before starting sync."
         )
         self.info_label.set_wrap(True)
-        self.info_label.set_halign(Gtk.Align.CENTER)
-        control_box.append(self.info_label)
+        self.info_label.set_wrap_mode(2)  # WORD_CHAR
+        self.info_banner.append(self.info_label)
+        control_box.append(self.info_banner)
 
-        main_box.append(control_frame)
+        main_box.append(control_box)
 
         # Apply initial window sizing based on preview setting
         self._apply_window_size()
+
+    def _update_sync_button_state(self, is_syncing: bool):
+        """Update sync button appearance based on state."""
+        self._is_syncing = is_syncing
+        self.sync_button.remove_css_class("suggested-action")
+        self.sync_button.remove_css_class("destructive-action")
+
+        if is_syncing:
+            self.sync_button.set_label("⏹  Stop Sync")
+            self.sync_button.add_css_class("destructive-action")
+        else:
+            self.sync_button.set_label("▶  Start Sync")
+            self.sync_button.add_css_class("suggested-action")
+
+    def _update_status_card(self, state: str):
+        """Update status card styling based on connection state."""
+        self.status_card.remove_css_class("status-connected")
+        self.status_card.remove_css_class("status-disconnected")
+        self.status_card.remove_css_class("status-syncing")
+        
+        if state == "syncing":
+            self.status_card.add_css_class("status-syncing")
+            self.status_icon.set_from_icon_name("emblem-synchronizing-symbolic")
+        elif state == "connected":
+            self.status_card.add_css_class("status-connected")
+            self.status_icon.set_from_icon_name("network-transmit-receive-symbolic")
+        else:
+            self.status_card.add_css_class("status-disconnected")
+            self.status_icon.set_from_icon_name("network-offline-symbolic")
+
+    def _on_about_clicked(self, button):
+        """Show about dialog."""
+        about = Adw.AboutDialog(
+            application_name="Lumux",
+            application_icon="video-display-symbolic",
+            developer_name="Lumux Contributors",
+            version="1.0.0",
+            comments="Sync your Philips Hue lights with your screen content",
+            license_type=Gtk.License.GPL_3_0,
+            website="https://github.com/lumux/lumux",
+        )
+        about.present(self)
+
+    def _on_sync_toggle(self, button):
+        """Toggle sync on/off."""
+        if self._is_syncing:
+            self._on_stop_clicked(button)
+        else:
+            self._on_start_clicked(button)
 
     def _check_bridge_connection(self):
         """Check if bridge is connected and update UI accordingly."""
@@ -130,35 +304,37 @@ class MainWindow(Gtk.ApplicationWindow):
         self.bridge_connected = status.connected
         
         if self.bridge_connected:
-            if status.light_count > 0:
-                ent_status = " (Entertainment: Connected)" if status.entertainment_connected else ""
-                self.status_label.set_text(f"Connected - {status.light_count} light(s) found{ent_status}")
+            if status.entertainment_zone_name:
+                channels = f"{status.entertainment_channel_count} channel(s)" if status.entertainment_channel_count else ""
+                self.status_label.set_text("Connected")
+                self.status_subtitle.set_text(f"Zone: {status.entertainment_zone_name} • {channels}")
+                self._update_status_card("connected")
             else:
-                self.status_label.set_text("Connected - No lights found")
-            self.start_btn.set_sensitive(True)
-            self.info_label.set_visible(False)
+                self.status_label.set_text("Connected")
+                self.status_subtitle.set_text("No entertainment zone configured")
+                self._update_status_card("connected")
+            self.sync_button.set_sensitive(True)
+            self.info_banner.set_visible(False)
+            self.stats_box.set_visible(True)
         else:
             if not status.configured:
-                self.status_label.set_text("Not configured - Open Settings to configure bridge")
+                self.status_label.set_text("Not Configured")
+                self.status_subtitle.set_text("Open Settings to configure your bridge")
             else:
-                self.status_label.set_text(f"Not connected to bridge at {status.bridge_ip}")
-            self.start_btn.set_sensitive(False)
-            self.info_label.set_visible(True)
+                self.status_label.set_text("Disconnected")
+                self.status_subtitle.set_text(f"Cannot reach bridge at {status.bridge_ip}")
+            self._update_status_card("disconnected")
+            self.sync_button.set_sensitive(False)
+            self.info_banner.set_visible(True)
+            self.stats_box.set_visible(False)
 
     def _apply_window_size(self):
         """Set default and attempt runtime resize according to `show_preview` setting."""
         preview = getattr(self.settings.zones, 'show_preview', True)
-        # set_default_size so GTK has a proper initial size
         if preview:
             self.set_default_size(*self._preview_size)
         else:
             self.set_default_size(*self._compact_size)
-
-        # try runtime resize for immediate effect (may not be supported everywhere)
-        try:
-            self.resize(*(self._preview_size if preview else self._compact_size))
-        except Exception:
-            pass
 
     def _update_status(self) -> bool:
         """Check for status updates from sync thread."""
@@ -175,46 +351,56 @@ class MainWindow(Gtk.ApplicationWindow):
             
             if status_type == 'status':
                 if message == 'syncing':
-                    self.status_label.set_text("Syncing...")
+                    self.status_label.set_text("Syncing")
+                    self.status_subtitle.set_text("Entertainment streaming active")
+                    self._update_status_card("syncing")
                     zone_colors = last_status[2]
                     if zone_colors and getattr(self.settings.zones, 'show_preview', True):
-                        # Only update preview when enabled
                         try:
                             self.zone_preview.update_colors(zone_colors)
                         except Exception:
                             pass
                 elif message == 'stopped':
                     self.status_label.set_text("Stopped")
-                    self.start_btn.set_sensitive(True)
-                    self.stop_btn.set_sensitive(False)
+                    self.status_subtitle.set_text("Ready to sync")
+                    self._update_status_card("connected")
+                    self._update_sync_button_state(False)
+                    self.sync_button.set_sensitive(True)
             elif status_type == 'error':
-                self.status_label.set_text(f"Error: {message}")
-                self.start_btn.set_sensitive(True)
-                self.stop_btn.set_sensitive(False)
+                self.status_label.set_text("Error")
+                self.status_subtitle.set_text(message)
+                self._update_status_card("disconnected")
+                self._update_sync_button_state(False)
+                self.sync_button.set_sensitive(True)
 
         stats = self.sync_controller.get_stats()
         if stats:
-            self.fps_label.set_text(f"FPS: {stats['fps']:.1f}")
-            self.frames_label.set_text(f"Frames: {stats['frame_count']}")
+            self.fps_value.set_text(f"{stats['fps']:.1f}")
+            self.frames_value.set_text(f"{stats['frame_count']}")
 
         return True
 
     def _on_start_clicked(self, button):
         """Start sync."""
         if not self.bridge_connected:
-            self.status_label.set_text("Cannot start - Bridge not connected")
+            self.status_label.set_text("Cannot Start")
+            self.status_subtitle.set_text("Bridge not connected")
             return
             
         if not self.sync_controller.is_running():
             # Connect entertainment streaming first
             if not self.app_context.start_entertainment():
-                self.status_label.set_text("Failed to connect entertainment streaming - check client_key and entertainment zone")
+                self.status_label.set_text("Connection Failed")
+                self.status_subtitle.set_text("Check client_key and entertainment zone settings")
+                self._update_status_card("disconnected")
                 return
             
             self.sync_controller.start()
-            self.start_btn.set_sensitive(False)
-            self.stop_btn.set_sensitive(True)
-            self.status_label.set_text("Starting sync (Entertainment streaming)...")
+            self._update_sync_button_state(True)
+            self.sync_button.set_sensitive(True)
+            self.status_label.set_text("Starting...")
+            self.status_subtitle.set_text("Connecting entertainment streaming")
+            self._update_status_card("syncing")
 
     def _on_stop_clicked(self, button):
         """Stop sync."""
@@ -222,23 +408,24 @@ class MainWindow(Gtk.ApplicationWindow):
             self.sync_controller.stop()
             # Disconnect entertainment streaming
             self.app_context.stop_entertainment()
-            self.start_btn.set_sensitive(True)
-            self.stop_btn.set_sensitive(False)
-            self.status_label.set_text("Stopping sync...")
+            self._update_sync_button_state(False)
+            self.sync_button.set_sensitive(True)
+            self.status_label.set_text("Stopping...")
+            self.status_subtitle.set_text("Disconnecting...")
 
     def _on_settings_clicked(self, button):
         """Open settings dialog."""
         dialog = SettingsDialog(self, self.app_context)
-        dialog.connect("close-request", self._on_settings_closed)
-        dialog.present()
+        dialog.connect("closed", self._on_settings_closed)
+        dialog.present(self)
     
-    def _on_settings_closed(self, dialog):
+    def _on_settings_closed(self, dialog=None):
         """Handle settings dialog close - refresh configuration."""
         self.app_context.apply_settings()
         self._check_bridge_connection()
         
         # Update preview visibility and layout
-        self.preview_frame.set_visible(self.settings.zones.show_preview)
+        self.preview_group.set_visible(self.settings.zones.show_preview)
         self.zone_preview.set_layout(
             self.settings.zones.layout,
             self.settings.zones.grid_rows,
@@ -247,8 +434,6 @@ class MainWindow(Gtk.ApplicationWindow):
 
         # Apply window sizing centrally
         self._apply_window_size()
-
-        return False
 
     def do_close_request(self) -> bool:
         """Handle window close request."""

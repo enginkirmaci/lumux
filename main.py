@@ -2,19 +2,24 @@
 
 import gi
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk
+gi.require_version("Adw", "1")
+from gi.repository import Gtk, Adw
 from config.settings_manager import SettingsManager
 from gui.main_window import MainWindow
 from lumux.app_context import AppContext
 
 
-class LumuxApp(Gtk.Application):
+class LumuxApp(Adw.Application):
     def __init__(self):
         super().__init__(application_id='com.github.lumux')
         self.connect('activate', self.on_activate)
 
     def on_activate(self, app):
         """Initialize and show main window."""
+        # Apply Adwaita dark color scheme
+        style_manager = Adw.StyleManager.get_default()
+        style_manager.set_color_scheme(Adw.ColorScheme.PREFER_DARK)
+        
         settings = SettingsManager.get_instance()
         self.app_context = AppContext(settings)
         bridge_status = self.app_context.start()
@@ -33,7 +38,7 @@ class LumuxApp(Gtk.Application):
         print("Shutting down...")
         if getattr(self, "app_context", None):
             self.app_context.shutdown()
-        Gtk.Application.do_shutdown(self)
+        Adw.Application.do_shutdown(self)
 
 
 def main():

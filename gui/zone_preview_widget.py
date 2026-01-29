@@ -1,10 +1,11 @@
-"""Zone preview widget for GUI."""
+"""Zone preview widget with modern styling."""
 
 import math
 
 import gi
 gi.require_version("Gtk", "4.0")
-from gi.repository import Gtk
+from gi.repository import Gtk, Gdk
+import cairo
 
 
 class ZonePreviewWidget(Gtk.DrawingArea):
@@ -17,6 +18,9 @@ class ZonePreviewWidget(Gtk.DrawingArea):
         self.layout = "grid"
         self.zone_colors: dict = {}
         self.zone_ids: list[str] = []
+        self._corner_radius = 12
+        self._cell_gap = 2
+        self._glow_enabled = True
         
         self.set_size_request(400, 300)
         self.set_draw_func(self._draw)
@@ -63,118 +67,167 @@ class ZonePreviewWidget(Gtk.DrawingArea):
 
     def _draw(self, widget, ctx, width, height):
         """Draw zone grid with current colors."""
+        # Draw background with rounded corners
+        self._draw_rounded_rect(ctx, 0, 0, width, height, self._corner_radius)
+        ctx.set_source_rgb(0.08, 0.08, 0.08)
+        ctx.fill()
+        
         if self.layout == "ambilight":
             self._draw_ambilight(ctx, width, height)
         else:
             self._draw_grid(ctx, width, height)
 
+    def _draw_rounded_rect(self, ctx, x, y, width, height, radius):
+        """Draw a rounded rectangle path."""
+        degrees = math.pi / 180.0
+        ctx.new_sub_path()
+        ctx.arc(x + width - radius, y + radius, radius, -90 * degrees, 0 * degrees)
+        ctx.arc(x + width - radius, y + height - radius, radius, 0 * degrees, 90 * degrees)
+        ctx.arc(x + radius, y + height - radius, radius, 90 * degrees, 180 * degrees)
+        ctx.arc(x + radius, y + radius, radius, 180 * degrees, 270 * degrees)
+        ctx.close_path()
+
+    def _draw_cell(self, ctx, x, y, w, h, rgb, corner_radius=6):
+        """Draw a single cell with optional glow effect."""
+        r, g, b = rgb[0]/255, rgb[1]/255, rgb[2]/255
+        
+        # Draw glow effect for bright colors
+        if self._glow_enabled and (r > 0.3 or g > 0.3 or b > 0.3):
+            brightness = (r + g + b) / 3
+            glow_radius = 4 + brightness * 6
+            
+            # Outer glow
+            for i in range(3):
+                alpha = 0.1 * (1 - i/3) * brightness
+                ctx.set_source_rgba(r, g, b, alpha)
+                self._draw_rounded_rect(ctx, x - glow_radius + i*2, y - glow_radius + i*2, 
+                                        w + glow_radius*2 - i*4, h + glow_radius*2 - i*4, 
+                                        corner_radius + glow_radius - i*2)
+                ctx.fill()
+        
+        # Main cell fill with gradient
+        pattern = cairo.LinearGradient(x, y, x, y + h)
+        pattern.add_color_stop_rgb(0, min(1, r * 1.2), min(1, g * 1.2), min(1, b * 1.2))
+        pattern.add_color_stop_rgb(1, r * 0.85, g * 0.85, b * 0.85)
+        
+        self._draw_rounded_rect(ctx, x, y, w, h, corner_radius)
+        ctx.set_source(pattern)
+        ctx.fill()
+        
+        # Subtle border
+        ctx.set_source_rgba(1, 1, 1, 0.1)
+        self._draw_rounded_rect(ctx, x, y, w, h, corner_radius)
+        ctx.set_line_width(0.5)
+        ctx.stroke()
+
     def _draw_grid(self, ctx, width, height):
-        """Draw standard grid layout."""
-        cell_width = width / self.cols
-        cell_height = height / self.rows
+        """Draw standard grid layout with modern styling."""
+        padding = 8
+        inner_width = width - 2 * padding
+        inner_height = height - 2 * padding
+        
+        cell_width = (inner_width - (self.cols - 1) * self._cell_gap) / self.cols
+        cell_height = (inner_height - (self.rows - 1) * self._cell_gap) / self.rows
 
         for row in range(self.rows):
             for col in range(self.cols):
                 zone_id = str(row * self.cols + col)
-                rgb = self.zone_colors.get(zone_id, (50, 50, 50))
+                rgb = self.zone_colors.get(zone_id, (30, 30, 30))
                 
-                x = col * cell_width
-                y = row * cell_height
+                x = padding + col * (cell_width + self._cell_gap)
+                y = padding + row * (cell_height + self._cell_gap)
                 
-                ctx.set_source_rgb(rgb[0]/255, rgb[1]/255, rgb[2]/255)
-                ctx.rectangle(x, y, cell_width, cell_height)
-                ctx.fill_preserve()
-                
-                ctx.set_source_rgb(0, 0, 0)
-                ctx.set_line_width(0.5)
-                ctx.stroke()
+                self._draw_cell(ctx, x, y, cell_width, cell_height, rgb, corner_radius=4)
 
     def _draw_ambilight(self, ctx, width, height):
-        """Draw ambilight layout (borders only)."""
-        edge_thickness = min(30, height // 8)
-        inner_width = width - 2 * edge_thickness
-        inner_height = height - 2 * edge_thickness
+        """Draw ambilight layout with modern styling."""
+        edge_thickness = min(36, height // 6)
+        inner_padding = 4
+        inner_width = width - 2 * edge_thickness - 2 * inner_padding
+        inner_height = height - 2 * edge_thickness - 2 * inner_padding
         
         top_count = self.cols
         bottom_count = self.cols
         left_count = self.rows
         right_count = self.rows
 
-        top_zone_width = width / top_count
-        bottom_zone_width = width / bottom_count
-        left_zone_height = inner_height / left_count
-        right_zone_height = inner_height / right_count
+        # Calculate zone sizes with gaps
+        top_zone_width = (width - (top_count + 1) * self._cell_gap) / top_count
+        bottom_zone_width = (width - (bottom_count + 1) * self._cell_gap) / bottom_count
+        left_zone_height = (inner_height - (left_count - 1) * self._cell_gap) / left_count
+        right_zone_height = (inner_height - (right_count - 1) * self._cell_gap) / right_count
 
-        idx = 0
-
+        # Draw top zones
         for i in range(top_count):
             zone_id = f"top_{i}"
-            rgb = self.zone_colors.get(zone_id, (50, 50, 50))
+            rgb = self.zone_colors.get(zone_id, (30, 30, 30))
             
-            x = i * top_zone_width
-            y = 0
+            x = self._cell_gap + i * (top_zone_width + self._cell_gap)
+            y = self._cell_gap
             w = top_zone_width
-            h = edge_thickness
+            h = edge_thickness - self._cell_gap
             
-            ctx.set_source_rgb(rgb[0]/255, rgb[1]/255, rgb[2]/255)
-            ctx.rectangle(x, y, w, h)
-            ctx.fill_preserve()
-            
-            ctx.set_source_rgb(0, 0, 0)
-            ctx.set_line_width(0.5)
-            ctx.stroke()
+            self._draw_cell(ctx, x, y, w, h, rgb)
 
+        # Draw bottom zones
         for i in range(bottom_count):
             zone_id = f"bottom_{i}"
-            rgb = self.zone_colors.get(zone_id, (50, 50, 50))
+            rgb = self.zone_colors.get(zone_id, (30, 30, 30))
             
-            x = i * bottom_zone_width
+            x = self._cell_gap + i * (bottom_zone_width + self._cell_gap)
             y = height - edge_thickness
             w = bottom_zone_width
-            h = edge_thickness
+            h = edge_thickness - self._cell_gap
             
-            ctx.set_source_rgb(rgb[0]/255, rgb[1]/255, rgb[2]/255)
-            ctx.rectangle(x, y, w, h)
-            ctx.fill_preserve()
-            
-            ctx.set_source_rgb(0, 0, 0)
-            ctx.set_line_width(0.5)
-            ctx.stroke()
+            self._draw_cell(ctx, x, y, w, h, rgb)
 
+        # Draw left zones
         for i in range(left_count):
             zone_id = f"left_{i}"
-            rgb = self.zone_colors.get(zone_id, (50, 50, 50))
+            rgb = self.zone_colors.get(zone_id, (30, 30, 30))
             
-            x = 0
-            y = edge_thickness + i * left_zone_height
-            w = edge_thickness
+            x = self._cell_gap
+            y = edge_thickness + inner_padding + i * (left_zone_height + self._cell_gap)
+            w = edge_thickness - self._cell_gap
             h = left_zone_height
             
-            ctx.set_source_rgb(rgb[0]/255, rgb[1]/255, rgb[2]/255)
-            ctx.rectangle(x, y, w, h)
-            ctx.fill_preserve()
-            
-            ctx.set_source_rgb(0, 0, 0)
-            ctx.set_line_width(0.5)
-            ctx.stroke()
+            self._draw_cell(ctx, x, y, w, h, rgb)
 
+        # Draw right zones
         for i in range(right_count):
             zone_id = f"right_{i}"
-            rgb = self.zone_colors.get(zone_id, (50, 50, 50))
+            rgb = self.zone_colors.get(zone_id, (30, 30, 30))
             
             x = width - edge_thickness
-            y = edge_thickness + i * right_zone_height
-            w = edge_thickness
+            y = edge_thickness + inner_padding + i * (right_zone_height + self._cell_gap)
+            w = edge_thickness - self._cell_gap
             h = right_zone_height
             
-            ctx.set_source_rgb(rgb[0]/255, rgb[1]/255, rgb[2]/255)
-            ctx.rectangle(x, y, w, h)
-            ctx.fill_preserve()
-            
-            ctx.set_source_rgb(0, 0, 0)
-            ctx.set_line_width(0.5)
-            ctx.stroke()
+            self._draw_cell(ctx, x, y, w, h, rgb)
 
-        ctx.set_source_rgb(0.1, 0.1, 0.1)
-        ctx.rectangle(edge_thickness, edge_thickness, inner_width, inner_height)
+        # Draw inner "screen" area with monitor bezel effect
+        screen_x = edge_thickness + inner_padding
+        screen_y = edge_thickness + inner_padding
+        
+        # Monitor bezel
+        self._draw_rounded_rect(ctx, screen_x - 2, screen_y - 2, 
+                                inner_width + 4, inner_height + 4, 8)
+        ctx.set_source_rgb(0.15, 0.15, 0.15)
         ctx.fill()
+        
+        # Screen surface
+        self._draw_rounded_rect(ctx, screen_x, screen_y, inner_width, inner_height, 6)
+        
+        # Create a subtle gradient for the screen
+        pattern = cairo.LinearGradient(screen_x, screen_y, screen_x, screen_y + inner_height)
+        pattern.add_color_stop_rgb(0, 0.06, 0.06, 0.08)
+        pattern.add_color_stop_rgb(0.5, 0.04, 0.04, 0.06)
+        pattern.add_color_stop_rgb(1, 0.02, 0.02, 0.04)
+        ctx.set_source(pattern)
+        ctx.fill()
+        
+        # Screen reflection highlight
+        ctx.set_source_rgba(1, 1, 1, 0.02)
+        self._draw_rounded_rect(ctx, screen_x, screen_y, inner_width, inner_height / 3, 6)
+        ctx.fill()
+

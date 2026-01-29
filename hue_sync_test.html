@@ -8,7 +8,7 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
         html, body { height: 100%; }
         body {
-            /* Fallback background in case the wheel doesn't cover corners */
+            /* Fallback background in case the wheel doesn't cover the full viewport */
             background: #ff0000;
             color: #fff;
             font-family: Arial, Helvetica, sans-serif;
@@ -44,7 +44,6 @@
         .wheel {
             width: 100%;
             height: 100%;
-            border-radius: 50%;
             filter: drop-shadow(0 10px 30px rgba(0,0,0,0.6));
             animation: spin 30s linear infinite;
             will-change: transform;

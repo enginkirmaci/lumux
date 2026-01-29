@@ -35,7 +35,6 @@ class MainWindow(Adw.ApplicationWindow):
         css_provider.load_from_string("""
             .status-card {
                 padding: 16px;
-                border-radius: 12px;
             }
             .status-connected {
                 background: alpha(@success_color, 0.1);
@@ -51,12 +50,10 @@ class MainWindow(Adw.ApplicationWindow):
             }
             .preview-card {
                 background: alpha(@card_bg_color, 0.8);
-                border-radius: 16px;
                 padding: 8px;
             }
             .control-button {
                 padding: 12px 32px;
-                border-radius: 24px;
                 font-weight: bold;
                 font-size: 14px;
             }
@@ -72,7 +69,6 @@ class MainWindow(Adw.ApplicationWindow):
             }
             .info-banner {
                 background: alpha(@accent_color, 0.1);
-                border-radius: 8px;
                 padding: 12px 16px;
             }
             .main-title {

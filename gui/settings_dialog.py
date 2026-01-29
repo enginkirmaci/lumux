@@ -183,8 +183,8 @@ class SettingsDialog(Adw.PreferencesDialog):
         self.fps_row.set_value(self.settings.sync.fps)
         sync_group.add(self.fps_row)
 
-        # Transition time
-        self.transition_row = Adw.SpinRow.new_with_range(0, 10000, 50)
+        # Transition time (max 1000 ms)
+        self.transition_row = Adw.SpinRow.new_with_range(0, 1000, 50)
         self.transition_row.set_title("Transition Time")
         self.transition_row.set_subtitle("Milliseconds for color transitions")
         self.transition_row.set_value(self.settings.sync.transition_time_ms)
@@ -212,10 +212,10 @@ class SettingsDialog(Adw.PreferencesDialog):
         self.gamma_row.set_value(self.settings.sync.gamma)
         color_group.add(self.gamma_row)
 
-        # Smoothing factor
-        self.smoothing_row = Adw.SpinRow.new_with_range(0.0, 1.0, 0.1)
+        # Smoothing factor (minimum 0.1)
+        self.smoothing_row = Adw.SpinRow.new_with_range(0.1, 1.0, 0.1)
         self.smoothing_row.set_title("Smoothing Factor")
-        self.smoothing_row.set_subtitle("Smooth color transitions (0 = none)")
+        self.smoothing_row.set_subtitle("Smooth color transitions")
         self.smoothing_row.set_digits(1)
         self.smoothing_row.set_value(self.settings.sync.smoothing_factor)
         color_group.add(self.smoothing_row)

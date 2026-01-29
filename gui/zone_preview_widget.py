@@ -1,7 +1,5 @@
 """Zone preview widget with modern styling."""
 
-import math
-
 import gi
 gi.require_version("Gtk", "4.0")
 from gi.repository import Gtk, Gdk
@@ -17,9 +15,7 @@ class ZonePreviewWidget(Gtk.DrawingArea):
         self.cols = cols
         self.zone_colors: dict = {}
         self.zone_ids: list[str] = []
-        self._corner_radius = 12
         self._cell_gap = 2
-        self._glow_enabled = True
         
         self.set_size_request(400, 300)
         self.set_draw_func(self._draw)
@@ -61,53 +57,31 @@ class ZonePreviewWidget(Gtk.DrawingArea):
 
     def _draw(self, widget, ctx, width, height):
         """Draw zone grid with current colors."""
-        # Draw background with rounded corners
-        self._draw_rounded_rect(ctx, 0, 0, width, height, self._corner_radius)
+        # Draw background (rectangular)
+        ctx.rectangle(0, 0, width, height)
         ctx.set_source_rgb(0.08, 0.08, 0.08)
         ctx.fill()
         
         self._draw_ambilight(ctx, width, height)
 
-    def _draw_rounded_rect(self, ctx, x, y, width, height, radius):
-        """Draw a rounded rectangle path."""
-        degrees = math.pi / 180.0
-        ctx.new_sub_path()
-        ctx.arc(x + width - radius, y + radius, radius, -90 * degrees, 0 * degrees)
-        ctx.arc(x + width - radius, y + height - radius, radius, 0 * degrees, 90 * degrees)
-        ctx.arc(x + radius, y + height - radius, radius, 90 * degrees, 180 * degrees)
-        ctx.arc(x + radius, y + radius, radius, 180 * degrees, 270 * degrees)
-        ctx.close_path()
+    
 
-    def _draw_cell(self, ctx, x, y, w, h, rgb, corner_radius=6):
+    def _draw_cell(self, ctx, x, y, w, h, rgb):
         """Draw a single cell with optional glow effect."""
         r, g, b = rgb[0]/255, rgb[1]/255, rgb[2]/255
-        
-        # Draw glow effect for bright colors
-        if self._glow_enabled and (r > 0.3 or g > 0.3 or b > 0.3):
-            brightness = (r + g + b) / 3
-            glow_radius = 4 + brightness * 6
-            
-            # Outer glow
-            for i in range(3):
-                alpha = 0.1 * (1 - i/3) * brightness
-                ctx.set_source_rgba(r, g, b, alpha)
-                self._draw_rounded_rect(ctx, x - glow_radius + i*2, y - glow_radius + i*2, 
-                                        w + glow_radius*2 - i*4, h + glow_radius*2 - i*4, 
-                                        corner_radius + glow_radius - i*2)
-                ctx.fill()
-        
+                
         # Main cell fill with gradient
         pattern = cairo.LinearGradient(x, y, x, y + h)
         pattern.add_color_stop_rgb(0, min(1, r * 1.2), min(1, g * 1.2), min(1, b * 1.2))
         pattern.add_color_stop_rgb(1, r * 0.85, g * 0.85, b * 0.85)
         
-        self._draw_rounded_rect(ctx, x, y, w, h, corner_radius)
+        ctx.rectangle(x, y, w, h)
         ctx.set_source(pattern)
         ctx.fill()
         
         # Subtle border
         ctx.set_source_rgba(1, 1, 1, 0.1)
-        self._draw_rounded_rect(ctx, x, y, w, h, corner_radius)
+        ctx.rectangle(x, y, w, h)
         ctx.set_line_width(0.5)
         ctx.stroke()
 
@@ -181,15 +155,14 @@ class ZonePreviewWidget(Gtk.DrawingArea):
         screen_x = edge_thickness + inner_padding
         screen_y = edge_thickness + inner_padding
         
-        # Monitor bezel
-        self._draw_rounded_rect(ctx, screen_x - 2, screen_y - 2, 
-                                inner_width + 4, inner_height + 4, 8)
+        # Monitor bezel (rectangular)
+        ctx.rectangle(screen_x - 2, screen_y - 2, inner_width + 4, inner_height + 4)
         ctx.set_source_rgb(0.15, 0.15, 0.15)
         ctx.fill()
-        
-        # Screen surface
-        self._draw_rounded_rect(ctx, screen_x, screen_y, inner_width, inner_height, 6)
-        
+
+        # Screen surface (rectangular)
+        ctx.rectangle(screen_x, screen_y, inner_width, inner_height)
+
         # Create a subtle gradient for the screen
         pattern = cairo.LinearGradient(screen_x, screen_y, screen_x, screen_y + inner_height)
         pattern.add_color_stop_rgb(0, 0.06, 0.06, 0.08)
@@ -198,8 +171,8 @@ class ZonePreviewWidget(Gtk.DrawingArea):
         ctx.set_source(pattern)
         ctx.fill()
         
-        # Screen reflection highlight
+        # Screen reflection highlight (rectangular)
         ctx.set_source_rgba(1, 1, 1, 0.02)
-        self._draw_rounded_rect(ctx, screen_x, screen_y, inner_width, inner_height / 3, 6)
+        ctx.rectangle(screen_x, screen_y, inner_width, inner_height / 3)
         ctx.fill()
 

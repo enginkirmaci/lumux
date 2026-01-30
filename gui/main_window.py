@@ -20,13 +20,14 @@ class MainWindow(Adw.ApplicationWindow):
         self.bridge_connected = False
         self._is_syncing = False
         # Window size presets
-        self._preview_size = (900, 700)
+        self._preview_size = (800, 640)
         self._compact_size = (500, 400)
 
         self._setup_css()
         self._build_ui()
+        # Run an initial bridge connection check so UI reflects state
         self._check_bridge_connection()
-        
+
         self.status_timeout_id = GLib.timeout_add(100, self._update_status)
 
     def _setup_css(self):
@@ -35,6 +36,7 @@ class MainWindow(Adw.ApplicationWindow):
         css_provider.load_from_string("""
             .status-card {
                 padding: 16px;
+                border-radius: 12px;
             }
             .status-connected {
                 background: alpha(@success_color, 0.1);
@@ -51,6 +53,7 @@ class MainWindow(Adw.ApplicationWindow):
             .preview-card {
                 background: alpha(@card_bg_color, 0.8);
                 padding: 8px;
+                border-radius: 10px;
             }
             .control-button {
                 padding: 12px 32px;
@@ -183,6 +186,17 @@ class MainWindow(Adw.ApplicationWindow):
 
         # Add stats box into the header so it appears to the right
         status_header.append(self.stats_box)
+
+        # Button to open bridge settings when disconnected (placed in header)
+        self.open_bridge_settings_btn = Gtk.Button()
+        self.open_bridge_settings_btn.set_label("Open Bridge Settings")
+        self.open_bridge_settings_btn.add_css_class("flat")
+        self.open_bridge_settings_btn.connect("clicked", self._on_settings_clicked)
+        self.open_bridge_settings_btn.set_halign(Gtk.Align.END)
+        self.open_bridge_settings_btn.set_valign(Gtk.Align.CENTER)
+        self.open_bridge_settings_btn.set_visible(False)
+        status_header.append(self.open_bridge_settings_btn)
+
         self.status_card.append(status_header)
         main_box.append(self.status_card)
 
@@ -219,21 +233,7 @@ class MainWindow(Adw.ApplicationWindow):
         self.sync_button.set_size_request(200, 48)
         control_box.append(self.sync_button)
 
-        # Info banner
-        self.info_banner = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
-        self.info_banner.add_css_class("info-banner")
-        self.info_banner.set_halign(Gtk.Align.CENTER)
         
-        info_icon = Gtk.Image.new_from_icon_name("dialog-information-symbolic")
-        self.info_banner.append(info_icon)
-        
-        self.info_label = Gtk.Label(
-            label="Configure your Hue bridge in Settings before starting sync."
-        )
-        self.info_label.set_wrap(True)
-        self.info_label.set_wrap_mode(2)  # WORD_CHAR
-        self.info_banner.append(self.info_label)
-        control_box.append(self.info_banner)
 
         main_box.append(control_box)
 
@@ -293,19 +293,17 @@ class MainWindow(Adw.ApplicationWindow):
         """Check if bridge is connected and update UI accordingly."""
         status = self.app_context.get_bridge_status(attempt_connect=True)
         self.bridge_connected = status.connected
-        
+        # Determine visibility and texts based on connection/configuration
         if self.bridge_connected:
             if status.entertainment_zone_name:
                 channels = f"{status.entertainment_channel_count} channel(s)" if status.entertainment_channel_count else ""
                 self.status_label.set_text("Connected")
                 self.status_subtitle.set_text(f"Zone: {status.entertainment_zone_name} • {channels}")
-                self._update_status_card("connected")
             else:
                 self.status_label.set_text("Connected")
                 self.status_subtitle.set_text("No entertainment zone configured")
-                self._update_status_card("connected")
+            self._update_status_card("connected")
             self.sync_button.set_sensitive(True)
-            self.info_banner.set_visible(False)
             self.stats_box.set_visible(True)
         else:
             if not status.configured:
@@ -316,8 +314,12 @@ class MainWindow(Adw.ApplicationWindow):
                 self.status_subtitle.set_text(f"Cannot reach bridge at {status.bridge_ip}")
             self._update_status_card("disconnected")
             self.sync_button.set_sensitive(False)
-            self.info_banner.set_visible(True)
             self.stats_box.set_visible(False)
+
+        # Show the settings button when either disconnected or not configured
+        if hasattr(self, 'open_bridge_settings_btn'):
+            show_btn = (not self.bridge_connected) or (not getattr(status, 'configured', True))
+            self.open_bridge_settings_btn.set_visible(bool(show_btn))
 
     def _apply_window_size(self):
         """Set default and attempt runtime resize according to `show_preview` setting."""

@@ -113,6 +113,38 @@ class SettingsDialog(Adw.PreferencesDialog):
         refresh_row.set_activatable_widget(refresh_btn)
         ent_group.add(refresh_row)
 
+        # General / Application page
+        general_page = Adw.PreferencesPage()
+        general_page.set_title("General")
+        general_page.set_icon_name("preferences-system-symbolic")
+        self.add(general_page)
+
+        general_group = Adw.PreferencesGroup()
+        general_group.set_title("Application")
+        general_group.set_description("Application behavior and startup options")
+        general_page.add(general_group)
+
+        # Start at startup
+        self.startup_row = Adw.SwitchRow()
+        self.startup_row.set_title("Start at Login")
+        self.startup_row.set_subtitle("Launch Lumux when you log in")
+        # If settings manager exposes ui property
+        try:
+            self.startup_row.set_active(self.settings.ui.start_at_startup)
+        except Exception:
+            self.startup_row.set_active(False)
+        general_group.add(self.startup_row)
+
+        # Minimize to tray when sync starts
+        self.minimize_row = Adw.SwitchRow()
+        self.minimize_row.set_title("Minimize to Tray on Sync")
+        self.minimize_row.set_subtitle("Automatically minimize the main window when sync starts")
+        try:
+            self.minimize_row.set_active(self.settings.ui.minimize_to_tray_on_sync)
+        except Exception:
+            self.minimize_row.set_active(False)
+        general_group.add(self.minimize_row)
+
         # Capture page
         capture_page = Adw.PreferencesPage()
         capture_page.set_title("Capture")
@@ -349,5 +381,26 @@ class SettingsDialog(Adw.PreferencesDialog):
         self.settings.sync.brightness_scale = self.brightness_row.get_value()
         self.settings.sync.gamma = self.gamma_row.get_value()
         self.settings.sync.smoothing_factor = self.smoothing_row.get_value()
+        # UI settings
+        try:
+            self.settings.ui.start_at_startup = bool(self.startup_row.get_active())
+            # Enable/disable autostart file
+            if self.settings.ui.start_at_startup:
+                try:
+                    self.settings.enable_autostart()
+                except Exception:
+                    pass
+            else:
+                try:
+                    self.settings.disable_autostart()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        try:
+            self.settings.ui.minimize_to_tray_on_sync = bool(self.minimize_row.get_active())
+        except Exception:
+            pass
         
         self.settings.save()

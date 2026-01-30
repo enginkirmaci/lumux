@@ -5,6 +5,9 @@ from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Optional, List
 from config.zone_mapping import ZoneMapping
+import sys
+import os
+import shlex
 
 
 @dataclass
@@ -38,11 +41,18 @@ class SyncSettings:
 
 
 @dataclass
+class UISettings:
+    start_at_startup: bool = False
+    minimize_to_tray_on_sync: bool = False
+
+
+@dataclass
 class Settings:
     hue: HueSettings = field(default_factory=HueSettings)
     capture: CaptureSettings = field(default_factory=CaptureSettings)
     zones: ZoneSettings = field(default_factory=ZoneSettings)
     sync: SyncSettings = field(default_factory=SyncSettings)
+    ui: UISettings = field(default_factory=UISettings)
 
 
 class SettingsManager:
@@ -84,6 +94,10 @@ class SettingsManager:
     def sync(self) -> SyncSettings:
         return self._settings.sync
 
+    @property
+    def ui(self):
+        return self._settings.ui
+
     def get_zone_mapping(self) -> ZoneMapping:
         """Return a ZoneMapping instance stored in the config directory.
 
@@ -104,6 +118,8 @@ class SettingsManager:
                 # Ensure we pass show_preview through when present
                 self._settings.zones = ZoneSettings(**data.get('zones', {}))
                 self._settings.sync = SyncSettings(**data.get('sync', {}))
+                # UI settings (optional)
+                self._settings.ui = UISettings(**data.get('ui', {}))
             except (json.JSONDecodeError, TypeError) as e:
                 print(f"Error loading settings: {e}")
                 self._validate_settings()
@@ -121,6 +137,8 @@ class SettingsManager:
             'capture': asdict(self._settings.capture),
             'zones': asdict(self._settings.zones),
             'sync': asdict(self._settings.sync)
+            ,
+            'ui': asdict(self._settings.ui)
         }
 
         with open(self._settings_file, 'w') as f:
@@ -147,6 +165,57 @@ class SettingsManager:
         self._settings.zones.rows = max(1, min(64, self._settings.zones.rows))
         self._settings.zones.cols = max(1, min(64, self._settings.zones.cols))
 
+        # UI settings validation
+        try:
+            self._settings.ui.start_at_startup = bool(self._settings.ui.start_at_startup)
+        except Exception:
+            self._settings.ui.start_at_startup = False
+        try:
+            self._settings.ui.minimize_to_tray_on_sync = bool(self._settings.ui.minimize_to_tray_on_sync)
+        except Exception:
+            self._settings.ui.minimize_to_tray_on_sync = False
+
     def _ensure_config_dir(self):
         """Ensure config directory exists."""
         self._config_dir.mkdir(parents=True, exist_ok=True)
+
+    def enable_autostart(self):
+        """Create a .desktop file in ~/.config/autostart to start the app at login (Linux)."""
+        autostart_dir = Path.home() / '.config' / 'autostart'
+        autostart_dir.mkdir(parents=True, exist_ok=True)
+
+        desktop_path = autostart_dir / 'lumux.desktop'
+
+        # Attempt to determine a reasonable Exec line. Use sys.argv[0] if available.
+        try:
+            exe = shlex.quote(sys.executable)
+            script = os.path.abspath(sys.argv[0]) if len(sys.argv) > 0 else ''
+            if script:
+                exec_cmd = f"{exe} {shlex.quote(script)}"
+            else:
+                exec_cmd = exe
+        except Exception:
+            exec_cmd = shlex.quote(sys.executable)
+
+        content = f"""[Desktop Entry]
+Type=Application
+Name=Lumux
+Exec={exec_cmd}
+X-GNOME-Autostart-enabled=true
+NoDisplay=true
+"""
+
+        try:
+            with open(desktop_path, 'w') as f:
+                f.write(content)
+        except Exception as e:
+            print(f"Failed to write autostart file: {e}")
+
+    def disable_autostart(self):
+        """Remove autostart .desktop file if present."""
+        desktop_path = Path.home() / '.config' / 'autostart' / 'lumux.desktop'
+        try:
+            if desktop_path.exists():
+                desktop_path.unlink()
+        except Exception as e:
+            print(f"Failed to remove autostart file: {e}")

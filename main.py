@@ -21,6 +21,15 @@ class LumuxApp(Adw.Application):
         style_manager.set_color_scheme(Adw.ColorScheme.PREFER_DARK)
         
         settings = SettingsManager.get_instance()
+        # Ensure autostart is created if user requested start-at-startup
+        try:
+            if getattr(settings, 'ui', None) and getattr(settings.ui, 'start_at_startup', False):
+                try:
+                    settings.enable_autostart()
+                except Exception:
+                    pass
+        except Exception:
+            pass
         self.app_context = AppContext(settings)
         bridge_status = self.app_context.start()
 

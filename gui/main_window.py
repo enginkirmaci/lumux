@@ -359,6 +359,15 @@ class MainWindow(Adw.ApplicationWindow):
                     self._update_status_card("connected")
                     self._update_sync_button_state(False)
                     self.sync_button.set_sensitive(True)
+                    # Restore window if it was hidden via minimize-on-sync
+                    try:
+                        if getattr(self.settings, 'ui', None) and getattr(self.settings.ui, 'minimize_to_tray_on_sync', False):
+                            try:
+                                self.present()
+                            except Exception:
+                                pass
+                    except Exception:
+                        pass
             elif status_type == 'error':
                 self.status_label.set_text("Error")
                 self.status_subtitle.set_text(message)
@@ -394,6 +403,15 @@ class MainWindow(Adw.ApplicationWindow):
             self.status_label.set_text("Starting...")
             self.status_subtitle.set_text("Connecting entertainment streaming")
             self._update_status_card("syncing")
+            # Optionally minimize to tray when sync begins
+            try:
+                if getattr(self.settings, 'ui', None) and getattr(self.settings.ui, 'minimize_to_tray_on_sync', False):
+                    try:
+                        self.hide()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
     def _on_stop_clicked(self, button):
         """Stop sync."""
@@ -405,6 +423,15 @@ class MainWindow(Adw.ApplicationWindow):
             self.sync_button.set_sensitive(True)
             self.status_label.set_text("Stopping...")
             self.status_subtitle.set_text("Disconnecting...")
+            # Restore window if it was hidden via minimize-on-sync
+            try:
+                if getattr(self.settings, 'ui', None) and getattr(self.settings.ui, 'minimize_to_tray_on_sync', False):
+                    try:
+                        self.present()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
     def _on_settings_clicked(self, button):
         """Open settings dialog."""

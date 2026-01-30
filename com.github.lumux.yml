@@ -4,6 +4,10 @@ runtime-version: "46"
 sdk: org.gnome.Sdk
 command: lumux
 
+build-options:
+  build-args:
+    - --share=network
+
 # Notes:
 # - This manifest is good for local builds. For Flathub, you must vendor Python
 #   dependencies as sources (no network during builds). A common workflow is to

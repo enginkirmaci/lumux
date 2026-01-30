@@ -7,13 +7,12 @@ from pathlib import Path
 setup(
     name="lumux",
     version="0.1.0",
-    description="Lumux ambient lighting sync for Wayland",
+    description="Lumux for Philips Hue Sync (Wayland)",
     author="Lumux Team",
     license="MIT",
     packages=find_packages(),
     install_requires=[
         'python-hue-v2>=0.1.0',
-        'pyscreenshot>=0.6.0',
         'numpy>=1.24.0',
         'Pillow>=10.0.0',
     ],
@@ -25,7 +24,8 @@ setup(
     data_files=[
         ('share/lumux/data', ['data/default_settings.json']),
         ('share/applications', ['data/com.github.lumux.desktop']),
-        ('share/icons/hicolor/scalable/apps', ['lumux.svg']),
+        ('share/metainfo', ['data/com.github.lumux.metainfo.xml']),
+        ('share/icons/hicolor/scalable/apps', ['com.github.lumux.svg']),
     ],
     python_requires='>=3.10',
     classifiers=[

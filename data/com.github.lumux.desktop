@@ -1,8 +1,8 @@
 [Desktop Entry]
-Name=Lumux
-Comment=Sync your Philips Hue lights with your screen content
+Name=Lumux for Philips Hue Sync
+Comment=Real-time Philips Hue screen sync (Wayland portal capture)
 Exec=lumux
-Icon=lumux
+Icon=com.github.lumux
 Terminal=false
 Type=Application
 Categories=Utility;GTK;

@@ -6,6 +6,7 @@ gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw
 from lumux.bridge import HueBridge
 from lumux.app_context import AppContext
+from config.settings_manager import is_running_in_flatpak
 
 
 class SettingsDialog(Adw.PreferencesDialog):
@@ -125,15 +126,16 @@ class SettingsDialog(Adw.PreferencesDialog):
         general_page.add(general_group)
 
         # Start at startup
-        self.startup_row = Adw.SwitchRow()
-        self.startup_row.set_title("Start at Login")
-        self.startup_row.set_subtitle("Launch Lumux when you log in")
-        # If settings manager exposes ui property
-        try:
-            self.startup_row.set_active(self.settings.ui.start_at_startup)
-        except Exception:
-            self.startup_row.set_active(False)
-        general_group.add(self.startup_row)
+        if not is_running_in_flatpak():
+            self.startup_row = Adw.SwitchRow()
+            self.startup_row.set_title("Start at Login")
+            self.startup_row.set_subtitle("Launch Lumux when you log in")
+            # If settings manager exposes ui property
+            try:
+                self.startup_row.set_active(self.settings.ui.start_at_startup)
+            except Exception:
+                self.startup_row.set_active(False)
+            general_group.add(self.startup_row)
 
         # Minimize to tray when sync starts
         self.minimize_row = Adw.SwitchRow()
@@ -382,21 +384,22 @@ class SettingsDialog(Adw.PreferencesDialog):
         self.settings.sync.gamma = self.gamma_row.get_value()
         self.settings.sync.smoothing_factor = self.smoothing_row.get_value()
         # UI settings
-        try:
-            self.settings.ui.start_at_startup = bool(self.startup_row.get_active())
-            # Enable/disable autostart file
-            if self.settings.ui.start_at_startup:
-                try:
-                    self.settings.enable_autostart()
-                except Exception:
-                    pass
-            else:
-                try:
-                    self.settings.disable_autostart()
-                except Exception:
-                    pass
-        except Exception:
-            pass
+        if hasattr(self, "startup_row"):
+            try:
+                self.settings.ui.start_at_startup = bool(self.startup_row.get_active())
+                # Enable/disable autostart file
+                if self.settings.ui.start_at_startup:
+                    try:
+                        self.settings.enable_autostart()
+                    except Exception:
+                        pass
+                else:
+                    try:
+                        self.settings.disable_autostart()
+                    except Exception:
+                        pass
+            except Exception:
+                pass
 
         try:
             self.settings.ui.minimize_to_tray_on_sync = bool(self.minimize_row.get_active())

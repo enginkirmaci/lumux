@@ -10,6 +10,11 @@ import os
 import shlex
 
 
+def is_running_in_flatpak() -> bool:
+    """Return True when running inside a Flatpak sandbox."""
+    return os.path.exists("/.flatpak-info") or bool(os.environ.get("FLATPAK_ID"))
+
+
 @dataclass
 class HueSettings:
     bridge_ip: str = ""
@@ -181,10 +186,14 @@ class SettingsManager:
 
     def enable_autostart(self):
         """Create a .desktop file in ~/.config/autostart to start the app at login (Linux)."""
+        if is_running_in_flatpak():
+            # Flatpak apps cannot write host autostart entries from inside the sandbox.
+            return
+
         autostart_dir = Path.home() / '.config' / 'autostart'
         autostart_dir.mkdir(parents=True, exist_ok=True)
 
-        desktop_path = autostart_dir / 'lumux.desktop'
+        desktop_path = autostart_dir / 'com.github.lumux.desktop'
 
         # Attempt to determine a reasonable Exec line. Use sys.argv[0] if available.
         try:
@@ -199,7 +208,7 @@ class SettingsManager:
 
         content = f"""[Desktop Entry]
 Type=Application
-Name=Lumux
+    Name=Lumux for Philips Hue Sync
 Exec={exec_cmd}
 X-GNOME-Autostart-enabled=true
 NoDisplay=true
@@ -213,7 +222,10 @@ NoDisplay=true
 
     def disable_autostart(self):
         """Remove autostart .desktop file if present."""
-        desktop_path = Path.home() / '.config' / 'autostart' / 'lumux.desktop'
+        if is_running_in_flatpak():
+            return
+
+        desktop_path = Path.home() / '.config' / 'autostart' / 'com.github.lumux.desktop'
         try:
             if desktop_path.exists():
                 desktop_path.unlink()

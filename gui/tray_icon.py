@@ -12,7 +12,7 @@ import json
 from typing import Optional
 
 # App icon path
-APP_ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lumux.svg")
+APP_ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "com.github.lumux.svg")
 
 
 class TrayIcon:
@@ -126,7 +126,7 @@ class TrayApp:
         
         # Create indicator
         self.indicator = AppIndicator.Indicator.new(
-            "lumux",
+            "com.github.lumux",
             "{icon_path}",
             AppIndicator.IndicatorCategory.APPLICATION_STATUS
         )

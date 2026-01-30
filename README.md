@@ -62,7 +62,7 @@ To register the application and its icon with your desktop environment, copy the
 ```bash
 # install files
 sudo mkdir -p /usr/share/icons/hicolor/scalable/apps
-sudo cp lumux.svg /usr/share/icons/hicolor/scalable/apps/lumux.svg
+sudo cp com.github.lumux.svg /usr/share/icons/hicolor/scalable/apps/com.github.lumux.svg
 sudo cp data/com.github.lumux.desktop /usr/share/applications/
 
 # update desktop DB and icon cache

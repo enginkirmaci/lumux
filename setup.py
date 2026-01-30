@@ -24,6 +24,8 @@ setup(
     },
     data_files=[
         ('share/lumux/data', ['data/default_settings.json']),
+        ('share/applications', ['data/com.github.lumux.desktop']),
+        ('share/icons/hicolor/scalable/apps', ['appicon.svg']),
     ],
     python_requires='>=3.10',
     classifiers=[

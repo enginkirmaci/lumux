@@ -1,12 +1,17 @@
 """Main application window with modern Adwaita styling."""
 
+import os
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, GLib, Adw, Gdk
+from gi.repository import Gtk, GLib, Adw, Gdk, Gio, GdkPixbuf
 from lumux.app_context import AppContext
 from gui.settings_dialog import SettingsDialog
 from gui.zone_preview_widget import ZonePreviewWidget
+from gui.tray_icon import TrayIcon
+
+# App icon path
+APP_ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "appicon.svg")
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -22,13 +27,43 @@ class MainWindow(Adw.ApplicationWindow):
         # Window size presets
         self._preview_size = (800, 640)
         self._compact_size = (500, 400)
+        
+        # System tray icon
+        self._tray_icon = None
 
+        self._setup_app_icon()
         self._setup_css()
         self._build_ui()
+        self._setup_tray_icon()
         # Run an initial bridge connection check so UI reflects state
         self._check_bridge_connection()
 
         self.status_timeout_id = GLib.timeout_add(100, self._update_status)
+    
+    def _setup_app_icon(self):
+        """Set up the window icon."""
+        if os.path.exists(APP_ICON_PATH):
+            try:
+                # Load and set window icon
+                texture = Gdk.Texture.new_from_filename(APP_ICON_PATH)
+                # For GTK4, we need to use paintable for window icon
+                # Store for use in about dialog
+                self._app_icon_file = Gio.File.new_for_path(APP_ICON_PATH)
+            except Exception as e:
+                print(f"Warning: Could not load app icon: {e}")
+                self._app_icon_file = None
+        else:
+            self._app_icon_file = None
+    
+    def _setup_tray_icon(self):
+        """Set up the system tray icon."""
+        try:
+            self._tray_icon = TrayIcon(self.get_application(), self)
+            if not self._tray_icon.is_available:
+                self._tray_icon = None
+        except Exception as e:
+            print(f"Note: System tray not available: {e}")
+            self._tray_icon = None
 
     def _setup_css(self):
         """Apply custom CSS styling."""
@@ -252,6 +287,10 @@ class MainWindow(Adw.ApplicationWindow):
         else:
             self.sync_button.set_label("▶  Start Sync")
             self.sync_button.add_css_class("suggested-action")
+        
+        # Update tray icon status
+        if self._tray_icon:
+            self._tray_icon.update_sync_status(is_syncing)
 
     def _update_status_card(self, state: str):
         """Update status card styling based on connection state."""
@@ -273,7 +312,7 @@ class MainWindow(Adw.ApplicationWindow):
         """Show about dialog."""
         about = Adw.AboutDialog(
             application_name="Lumux",
-            application_icon="video-display-symbolic",
+            application_icon="appicon",  # Uses icon from theme search path
             developer_name="Lumux Contributors",
             version="1.0.0",
             comments="Sync your Philips Hue lights with your screen content",
@@ -459,5 +498,10 @@ class MainWindow(Adw.ApplicationWindow):
         if self.status_timeout_id:
             GLib.source_remove(self.status_timeout_id)
             self.status_timeout_id = None
+        
+        # Clean up tray icon
+        if self._tray_icon:
+            self._tray_icon.destroy()
+            self._tray_icon = None
         
         return False

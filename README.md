@@ -55,6 +55,28 @@ pip install -e .
 lumux
 ```
 
+### Install desktop entry and icon (system-wide)
+
+To register the application and its icon with your desktop environment, copy the desktop file and icon into the system locations and update the caches:
+
+```bash
+# install files
+sudo mkdir -p /usr/share/icons/hicolor/scalable/apps
+sudo cp appicon.svg /usr/share/icons/hicolor/scalable/apps/appicon.svg
+sudo cp data/com.github.lumux.desktop /usr/share/applications/
+
+# update desktop DB and icon cache
+sudo update-desktop-database /usr/share/applications
+sudo gtk-update-icon-cache -f /usr/share/icons/hicolor
+```
+
+If `gtk-update-icon-cache` reports "No theme index file", create a minimal index and retry:
+
+```bash
+printf '[Icon Theme]\nName=hicolor\n' | sudo tee /usr/share/icons/hicolor/index.theme > /dev/null
+sudo gtk-update-icon-cache -f /usr/share/icons/hicolor
+```
+
 ## Usage
 
 ### First Time Setup

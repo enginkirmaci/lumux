@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512"
+     xmlns="http://www.w3.org/2000/svg">
+
+  <defs>
+    <!-- Hue gradient -->
+    <linearGradient id="hue" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ff3b5c"/>
+      <stop offset="25%" stop-color="#ffb000"/>
+      <stop offset="50%" stop-color="#2cff00"/>
+      <stop offset="75%" stop-color="#00c8ff"/>
+      <stop offset="100%" stop-color="#7a5cff"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <!-- <rect x="28" y="28" width="456" height="456" rx="120"
+        fill="#0f1115"/> -->
+
+  <!-- Thick hue border -->
+  <rect x="28" y="28" width="456" height="456" rx="120"
+        fill="none"
+        stroke="url(#hue)"
+        stroke-width="26"
+        opacity="0.95"/>
+
+  <!-- Monitor (much bigger & wider) -->
+  <rect x="96" y="156" width="320" height="170" rx="22"
+        fill="#1a1d24"/>
+
+  <!-- Sync glow -->
+  <rect x="120" y="180" width="272" height="122" rx="16"
+        fill="url(#hue)"
+        opacity="0.9"/>
+
+  <!-- Stand -->
+  <rect x="232" y="332" width="48" height="32" rx="8"
+        fill="#2a2e38"/>
+  <rect x="184" y="364" width="144" height="16" rx="8"
+        fill="#2a2e38"/>
+
+</svg>

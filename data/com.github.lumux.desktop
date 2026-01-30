@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Lumux
+Comment=Sync your Philips Hue lights with your screen content
+Exec=lumux
+Icon=appicon
+Terminal=false
+Type=Application
+Categories=Utility;GTK;
+Keywords=hue;philips;lights;sync;screen;ambilight;
+StartupNotify=true
+StartupWMClass=com.github.lumux

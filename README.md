@@ -1,191 +1,145 @@
-# Philips Hue Sync for Wayland
+# Lumux — Philips Hue Sync for Wayland
 
-Real-time ambient lighting synchronization for Philips Hue lights on Fedora Linux (Wayland).
+Real-time ambient lighting synchronization for Philips Hue lights on Linux (Wayland) using a GTK4/Adwaita interface.
 
-## Features
+Status: Active
 
+Features
 - Real-time screen capture and color synchronization
 - Ambilight-style edge zone layout
-- GTK4 native interface
-- Optimized performance with configurable resolution and FPS
+- GTK4 + libadwaita native interface
+- Configurable resolution scale and FPS for performance tuning
 - Support for multiple Hue zones and lights
-- RGB to XY color space conversion for accurate colors
+- RGB ↔ XY color conversion for Hue color accuracy
 - Smooth color transitions with configurable smoothing
-- Multi-monitor support
+- Multi-monitor support (subject to compositor portal support)
+- System tray integration when available
 
-## Requirements
+Requirements
 
-### System Dependencies (Fedora)
+System
+- Linux with a Wayland compositor that supports screen-casting portals (xdg-desktop-portal)
+- OpenSSL (system) required if using DTLS / entertainment streaming
 
-```bash
-sudo dnf install gtk4-devel gobject-introspection-devel python3-devel
-sudo dnf install libadwaita-devel
-sudo dnf install grim  # Optional fallback screenshot tool
-```
+Common packages (example on Fedora)
+- gtk4, libadwaita, xdg-desktop-portal (install via your distro package manager)
 
-### Python Dependencies
+Python
+- Python 3.10+ recommended
+- Install Python packages from requirements.txt (current list):
+  - python-hue-v2>=0.1.0
+  - numpy>=1.24.0
+  - Pillow>=10.0.0
+  - requests>=2.28.0
+  - pydbus>=0.6.0
 
-Install from `requirements.txt`:
+Install
 
-```bash
-pip install -r requirements.txt
-```
+From source
+1. Clone the repository:
+   git clone https://github.com/enginkirmaci/lumux.git
+   cd lumux
+2. Install dependencies:
+   pip install -r requirements.txt
+3. Run:
+   python main.py
+   or, if installed:
+   lumux
 
-Or install with setup.py:
+Editable install
+- pip install -e .
 
-```bash
-pip install -e .
-```
-
-## Installation
-
-### From Source
-
-```bash
-git clone <repository-url>
-cd lumux
-pip install -r requirements.txt
-python main.py
-```
-
-### With setup.py
-
-```bash
-pip install -e .
-lumux
-```
-
-### Install desktop entry and icon (system-wide)
-
-To register the application and its icon with your desktop environment, copy the desktop file and icon into the system locations and update the caches:
-
-```bash
-# install files
+Desktop integration (optional)
+To install the desktop entry and icon system-wide (may require adjusting paths):
 sudo mkdir -p /usr/share/icons/hicolor/scalable/apps
 sudo cp com.github.lumux.svg /usr/share/icons/hicolor/scalable/apps/com.github.lumux.svg
 sudo cp data/com.github.lumux.desktop /usr/share/applications/
-
-# update desktop DB and icon cache
 sudo update-desktop-database /usr/share/applications
 sudo gtk-update-icon-cache -f /usr/share/icons/hicolor
-```
 
-If `gtk-update-icon-cache` reports "No theme index file", create a minimal index and retry:
-
-```bash
+If gtk-update-icon-cache complains about missing index.theme:
 printf '[Icon Theme]\nName=hicolor\n' | sudo tee /usr/share/icons/hicolor/index.theme > /dev/null
 sudo gtk-update-icon-cache -f /usr/share/icons/hicolor
-```
 
-## Usage
+Usage
 
-### First Time Setup
-
-1. Run the application:
-   ```bash
+First time setup
+1. Start the application:
    python main.py
-   ```
    or
-   ```bash
    lumux
-   ```
-
-2. Click **Settings** button
-
-3. **Bridge Connection** tab:
-   - Click **Discover Bridges** to find your Hue bridge on the network
-   - Or manually enter the bridge IP address
-   - Click **Authenticate** and press the link button on your bridge
-   - The app key will be automatically populated
-
-4. **Zone Configuration** tab:
+2. Open Settings
+3. Bridge Connection
+   - Discover Bridges or enter IP manually
+   - Click Authenticate and press the link button on your Hue bridge to obtain the app key
+4. Zone Configuration
    - Configure ambilight zones for edge-based color capture
+5. Sync Settings
+   - Adjust transition time, brightness scale, smoothing, resolution scale and FPS
+   - Save settings
 
-5. **Sync Settings** tab:
-   - Adjust transition time, brightness scale, and smoothing factor
-   - Click **Save**
+Starting sync
+1. Click Start Sync
+2. Zone preview shows real-time screen colors
+3. Hue lights will follow the captured colors
+4. Click Stop Sync to stop
 
-### Starting Sync
+Configuration
+- Settings are saved to ~/.config/lumux/settings.json
+- Autostart can be enabled via settings (if supported by the system)
 
-1. Click **Start Sync** button
-2. The zone preview will show real-time screen colors
-3. Your Hue lights will sync with screen colors
-4. Click **Stop Sync** to stop
+Performance tips
+- Resolution scale: reduce (e.g. 0.125 or 0.0625) to lower CPU usage
+- FPS: 15–30 is often sufficient
+- Transition time and smoothing: increase for smoother output
 
-### Configuration
+Troubleshooting
 
-Settings are automatically saved to `~/.config/lumux/settings.json`
+Wayland screen capture issues
+- Ensure xdg-desktop-portal is installed and properly configured on your distro
+- Some compositors (or portal backends) may require additional user permissions or settings
 
-## Zone Layout
+Bridge connection issues
+- Ensure your device is on the same local network as the Hue bridge
+- Verify the bridge is reachable via the bridge web interface
+- Temporarily test with firewall disabled if necessary
 
-### Ambilight
-Captures colors from screen edges (top, bottom, left, right). Best for lights placed around your monitor.
+High CPU usage
+- Lower FPS and resolution scale in settings
 
+Development
 
-## Performance Tips
-
-- **Resolution Scale**: Lower scale factor (0.125 = 1/8 resolution) improves performance
-- **FPS**: 15-30 FPS is usually sufficient for smooth syncing
-- **Transition Time**: Higher values (100-300ms) provide smoother transitions
-- **Smoothing Factor**: 0.3-0.5 provides balanced color transitions
-
-## Troubleshooting
-
-### Wayland Screen Capture Issues
-
-If screen capture doesn't work on Wayland:
-
-1. Check that you have proper permissions:
-   ```bash
-   # Ensure xdg-desktop- portal is installed
-   sudo dnf install xdg-desktop-portal
-   ```
-
-2. Some Wayland compositors may require additional configuration
-
-### Bridge Connection Issues
-
-1. Ensure your device is on the same network as the Hue bridge
-2. Try disabling firewall temporarily to test
-3. Check that the Hue bridge is accessible via web interface
-
-### High CPU Usage
-
-- Reduce FPS in settings (try 10-15 FPS)
-- Lower resolution scale (try 0.0625 = 1/16 resolution)
-
-## Development
-
-### Project Structure
-
-```
+Project layout (representative)
 lumux/
 ├── main.py                 # Application entry point
+├── lumux/
+│   └── app_context.py      # App context and bootstrapping
 ├── hue_sync/               # Core sync modules
-│   ├── bridge.py           # Hue bridge connection
-│   ├── capture.py          # Screen capture
-│   ├── zones.py            # Zone processing
-│   ├── colors.py           # Color analysis
-│   └── sync.py            # Main sync controller
-├── gui/                   # GTK4 interface
-│   ├── main_window.py      # Main window
-│   ├── settings_dialog.py  # Settings dialog
-│   └── zone_preview_widget.py  # Zone visualization
-├── config/                # Configuration
-│   ├── settings_manager.py  # Settings management
-│   └── zone_mapping.py    # Zone to light mapping
-├── utils/                 # Utilities
-│   └── rgb_xy_converter.py # Color conversion
-├── data/                  # Default data files
+│   ├── bridge.py
+│   ├── capture.py
+│   ├── zones.py
+│   ├── colors.py
+│   └── sync.py
+├── gui/                    # GTK4 interface
+│   ├── main_window.py
+│   ├── settings_dialog.py
+│   ├── zone_preview_widget.py
+│   └── tray_icon.py
+├── config/
+│   ├── settings_manager.py
+├── utils/
+│   └── rgb_xy_converter.py
+├── data/
 ├── requirements.txt
 ├── setup.py
 └── README.md
-```
 
-## License
+Contributing
+Contributions welcome. Please open issues and pull requests. If you plan large changes, open an issue first to discuss.
 
+License
 MIT License
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit issues and pull requests.
+Acknowledgements / Notes
+- Works with Hue v2 API library (python-hue-v2)
+- Screen capture on Wayland depends on the compositor and the portal implementation

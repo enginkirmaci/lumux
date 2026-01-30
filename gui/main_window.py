@@ -11,7 +11,7 @@ from gui.zone_preview_widget import ZonePreviewWidget
 from gui.tray_icon import TrayIcon
 
 # App icon path
-APP_ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "appicon.svg")
+APP_ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lumux.svg")
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -312,7 +312,7 @@ class MainWindow(Adw.ApplicationWindow):
         """Show about dialog."""
         about = Adw.AboutDialog(
             application_name="Lumux",
-            application_icon="appicon",  # Uses icon from theme search path
+            application_icon="lumux",  # Uses icon from theme search path
             developer_name="Lumux Contributors",
             version="1.0.0",
             comments="Sync your Philips Hue lights with your screen content",

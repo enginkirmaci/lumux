@@ -12,7 +12,7 @@ import json
 from typing import Optional
 
 # App icon path
-APP_ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "appicon.svg")
+APP_ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "lumux.svg")
 
 
 class TrayIcon:

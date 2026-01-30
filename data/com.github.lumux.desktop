@@ -2,7 +2,7 @@
 Name=Lumux
 Comment=Sync your Philips Hue lights with your screen content
 Exec=lumux
-Icon=appicon
+Icon=lumux
 Terminal=false
 Type=Application
 Categories=Utility;GTK;

@@ -10,7 +10,7 @@ from gui.main_window import MainWindow
 from lumux.app_context import AppContext
 
 # Get the app icon path (relative to this file)
-APP_ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "appicon.svg")
+APP_ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lumux.svg")
 
 
 class LumuxApp(Adw.Application):

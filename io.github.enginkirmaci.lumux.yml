@@ -15,7 +15,7 @@ finish-args:
   - --share=network
 
   # Screen capture via portals / PipeWire
-  - --filesystem=xdg-run/pipewire-0
+  - --filesystem=xdg-run/pipewire-0:ro
 
 cleanup:
   - /include

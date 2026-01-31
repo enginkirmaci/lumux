@@ -1,6 +1,9 @@
 {
     "name": "python3-modules.json",
     "buildsystem": "simple",
+    "cleanup": [
+        "*"
+    ],
     "build-commands": [],
     "modules": [
         {

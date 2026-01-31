@@ -11,7 +11,7 @@ from gui.zone_preview_widget import ZonePreviewWidget
 from gui.tray_icon import TrayIcon
 
 # App icon path
-APP_ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "com.github.lumux.svg")
+APP_ICON_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "io.github.enginkirmaci.lumux.svg")
 
 
 class MainWindow(Adw.ApplicationWindow):
@@ -262,7 +262,16 @@ class MainWindow(Adw.ApplicationWindow):
         self.sync_button.add_css_class("control-button")
         self.sync_button.add_css_class("suggested-action")
         self.sync_button.add_css_class("pill")
-        self._update_sync_button_state(False)
+        
+        # Create box with icon and label for the button
+        self.sync_button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        self.sync_button_box.set_halign(Gtk.Align.CENTER)
+        self.sync_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
+        self.sync_label = Gtk.Label(label="Start Sync")
+        self.sync_button_box.append(self.sync_icon)
+        self.sync_button_box.append(self.sync_label)
+        self.sync_button.set_child(self.sync_button_box)
+        
         self.sync_button.connect("clicked", self._on_sync_toggle)
         self.sync_button.set_halign(Gtk.Align.CENTER)
         self.sync_button.set_size_request(200, 48)
@@ -282,10 +291,12 @@ class MainWindow(Adw.ApplicationWindow):
         self.sync_button.remove_css_class("destructive-action")
 
         if is_syncing:
-            self.sync_button.set_label("⏹  Stop Sync")
+            self.sync_icon.set_from_icon_name("media-playback-stop-symbolic")
+            self.sync_label.set_label("Stop Sync")
             self.sync_button.add_css_class("destructive-action")
         else:
-            self.sync_button.set_label("▶  Start Sync")
+            self.sync_icon.set_from_icon_name("media-playback-start-symbolic")
+            self.sync_label.set_label("Start Sync")
             self.sync_button.add_css_class("suggested-action")
         
         # Update tray icon status
@@ -312,7 +323,7 @@ class MainWindow(Adw.ApplicationWindow):
         """Show about dialog."""
         about = Adw.AboutDialog(
             application_name="Lumux for Philips Hue Sync",
-            application_icon="lumux",  # Uses icon from theme search path
+            application_icon="io.github.enginkirmaci.lumux",  # Uses icon from theme search path
             developer_name="Lumux Contributors",
             version="0.1.0",
             comments="Sync your Philips Hue lights with your screen in real time.",

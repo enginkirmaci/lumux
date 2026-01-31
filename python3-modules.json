@@ -1,0 +1,64 @@
+{
+    "name": "python3-modules",
+    "buildsystem": "simple",
+    "build-commands": [
+        "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} certifi charset_normalizer idna ifaddr numpy pillow pydbus python_hue_v2 requests urllib3 zeroconf --no-build-isolation"
+    ],
+    "sources": [
+        {
+            "type": "file",
+            "url": "https://files.pythonhosted.org/packages/e6/ad/3cc14f097111b4de0040c83a525973216457bbeeb63739ef1ed275c1c021/certifi-2026.1.4-py3-none-any.whl",
+            "sha256": "9943707519e4add1115f44c2bc244f782c0249876bf51b6599fee1ffbedd685c"
+        },
+        {
+            "type": "file",
+            "url": "https://files.pythonhosted.org/packages/6d/fc/de9cce525b2c5b94b47c70a4b4fb19f871b24995c728e957ee68ab1671ea/charset_normalizer-3.4.4-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+            "sha256": "840c25fb618a231545cbab0564a799f101b63b9901f2569faecd6b222ac72381"
+        },
+        {
+            "type": "file",
+            "url": "https://files.pythonhosted.org/packages/0e/61/66938bbb5fc52dbdf84594873d5b51fb1f7c7794e9c0f5bd885f30bc507b/idna-3.11-py3-none-any.whl",
+            "sha256": "771a87f49d9defaf64091e6e6fe9c18d4833f140bd19464795bc32d966ca37ea"
+        },
+        {
+            "type": "file",
+            "url": "https://files.pythonhosted.org/packages/9c/1f/19ebc343cc71a7ffa78f17018535adc5cbdd87afb31d7c34874680148b32/ifaddr-0.2.0-py3-none-any.whl",
+            "sha256": "085e0305cfe6f16ab12d72e2024030f5d52674afad6911bb1eee207177b8a748"
+        },
+        {
+            "type": "file",
+            "url": "https://files.pythonhosted.org/packages/5d/9d/7862db06743f489e6a502a3b93136d73aea27d97b2cf91504f70a27501d6/numpy-2.4.1-cp311-cp311-manylinux_2_27_x86_64.manylinux_2_28_x86_64.whl",
+            "sha256": "538bf4ec353709c765ff75ae616c34d3c3dca1a68312727e8f2676ea644f8509"
+        },
+        {
+            "type": "file",
+            "url": "https://files.pythonhosted.org/packages/ef/30/0df458009be6a4caca4ca2c52975e6275c387d4e5c95544e34138b41dc86/pillow-12.1.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.whl",
+            "sha256": "800429ac32c9b72909c671aaf17ecd13110f823ddb7db4dfef412a5587c2c24e"
+        },
+        {
+            "type": "file",
+            "url": "https://files.pythonhosted.org/packages/31/34/1c1e201ec57f0b5f5dd3fc2b00cdb00c2b2ce89f000fab90c23a4e286587/pydbus-0.6.0-py2.py3-none-any.whl",
+            "sha256": "66b80106352a718d80d6c681dc2a82588048e30b75aab933e4020eb0660bf85e"
+        },
+        {
+            "type": "file",
+            "url": "https://files.pythonhosted.org/packages/66/98/f788b68f140a8700bd9b53faee7590d8c21b304c6dcee6c9159a35370a85/python_hue_v2-2.2.1-py3-none-any.whl",
+            "sha256": "35bcd3ab257220ba3acddb624cf67b85c986af9551d18fb4fc21f9737b73d66d"
+        },
+        {
+            "type": "file",
+            "url": "https://files.pythonhosted.org/packages/1e/db/4254e3eabe8020b458f1a747140d32277ec7a271daf1d235b70dc0b4e6e3/requests-2.32.5-py3-none-any.whl",
+            "sha256": "2462f94637a34fd532264295e186976db0f5d453d1cdd31473c85a6a161affb6"
+        },
+        {
+            "type": "file",
+            "url": "https://files.pythonhosted.org/packages/39/08/aaaad47bc4e9dc8c725e68f9d04865dbcb2052843ff09c97b08904852d84/urllib3-2.6.3-py3-none-any.whl",
+            "sha256": "bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4"
+        },
+        {
+            "type": "file",
+            "url": "https://files.pythonhosted.org/packages/42/1f/d8b365a3f3979ea3f0ecb02c22c61d2cdc4fc5bc0bc182ff52547935923c/zeroconf-0.148.0-cp311-cp311-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl",
+            "sha256": "b8aa15461e35169b4ec25cc45ec82750023e6c2e96ebc099a014caaf544316f7"
+        }
+    ]
+}

@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.enginkirmaci.lumux</id>
+  <name>Lumux for Philips Hue Sync</name>
+  <summary>Real-time Philips Hue sync with your screen</summary>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+
+  <developer id="io.github.enginkirmaci">
+    <name>Engin Kirmaci</name>
+  </developer>
+
+  <launchable type="desktop-id">io.github.enginkirmaci.lumux.desktop</launchable>
+  <provides>
+    <binary>lumux</binary>
+  </provides>
+
+  <description>
+    <p>
+      Lumux for Philips Hue Sync is a lightweight desktop app that analyzes the colors on your screen
+      and streams them to a Philips Hue Entertainment area for an "ambilight" effect.
+    </p>
+    <p>
+      It is designed for Wayland desktops and uses the XDG Desktop Portal ScreenCast API (PipeWire)
+      so you control when and what Lumux can capture.
+    </p>
+    <p>Key features:</p>
+    <ul>
+      <li>Hue Entertainment streaming (DTLS) for smooth, low-latency updates</li>
+      <li>Portal-based screen capture on Wayland (no privileged access required)</li>
+      <li>Configurable zone grid and real-time zone preview</li>
+      <li>Performance controls (resolution scale, target FPS, smoothing, gamma/brightness)</li>
+      <li>Optional tray integration and quick start/stop controls</li>
+    </ul>
+    <p>
+      Requires a Philips Hue Bridge and an Entertainment area configured in the Hue app.
+    </p>
+  </description>
+
+  <url type="homepage">https://github.com/enginkirmaci/lumux</url>
+  <url type="bugtracker">https://github.com/enginkirmaci/lumux/issues</url>
+
+  <branding>
+    <color type="primary" scheme_preference="dark">#FFA500</color>
+  </branding>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/main/screenshots/screenshot1.png</image>
+      <caption>Main application window with zone preview</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/main/screenshots/screenshot2.png</image>
+      <caption>Settings and configuration</caption>
+    </screenshot>
+  </screenshots>
+
+  <content_rating type="oars-1.1"/>
+
+  <releases>
+    <release version="0.1.0" date="2026-01-30">
+      <description>
+        <p>Initial release of Lumux for Philips Hue Sync.</p>
+        <ul>
+          <li>Hue Entertainment streaming with DTLS for smooth, low-latency light updates</li>
+          <li>Portal-based screen capture on Wayland using XDG Desktop Portal and PipeWire</li>
+          <li>Configurable zone grid with real-time preview</li>
+          <li>Performance controls including resolution scale, target FPS, smoothing, gamma, and brightness</li>
+          <li>System tray integration with quick start/stop controls</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+</component>

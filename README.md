@@ -52,8 +52,8 @@ Editable install
 Desktop integration (optional)
 To install the desktop entry and icon system-wide (may require adjusting paths):
 sudo mkdir -p /usr/share/icons/hicolor/scalable/apps
-sudo cp com.github.lumux.svg /usr/share/icons/hicolor/scalable/apps/com.github.lumux.svg
-sudo cp data/com.github.lumux.desktop /usr/share/applications/
+sudo cp io.github.enginkirmaci.lumux.svg /usr/share/icons/hicolor/scalable/apps/io.github.enginkirmaci.lumux.svg
+sudo cp data/io.github.enginkirmaci.lumux.desktop /usr/share/applications/
 sudo update-desktop-database /usr/share/applications
 sudo gtk-update-icon-cache -f /usr/share/icons/hicolor
 

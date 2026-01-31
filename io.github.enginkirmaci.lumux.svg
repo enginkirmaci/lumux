@@ -3,13 +3,12 @@
    viewBox="0 0 600 600"
    version="1.1"
    id="svg17"
-   sodipodi:docname="com.github.lumux.svg"
+   sodipodi:docname="io.github.enginkirmaci.lumux.svg"
    width="600"
    height="600"
    inkscape:version="1.4.3 (0d15f75042, 2025-12-25)"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
-   xmlns:xlink="http://www.w3.org/1999/xlink"
    xmlns="http://www.w3.org/2000/svg"
    xmlns:svg="http://www.w3.org/2000/svg">
   <sodipodi:namedview
@@ -21,15 +20,15 @@
      inkscape:pageopacity="0.0"
      inkscape:pagecheckerboard="0"
      inkscape:deskcolor="#d1d1d1"
-     inkscape:zoom="1.3493954"
-     inkscape:cx="173.411"
-     inkscape:cy="344.22824"
+     inkscape:zoom="1.9083333"
+     inkscape:cx="315.19652"
+     inkscape:cy="307.86027"
      inkscape:window-width="1905"
      inkscape:window-height="1371"
      inkscape:window-x="0"
      inkscape:window-y="0"
      inkscape:window-maximized="0"
-     inkscape:current-layer="svg17" />
+     inkscape:current-layer="g18" />
   <!-- Background -->
   <!-- Monitor stand -->
   <!-- Monitor frame -->
@@ -37,18 +36,6 @@
   <!-- Rainbow burst rays -->
   <defs
      id="defs6">
-    <linearGradient
-       id="linearGradient20"
-       inkscape:collect="always">
-      <stop
-         style="stop-color:#ab4491;stop-opacity:1;"
-         offset="0"
-         id="stop20" />
-      <stop
-         style="stop-color:#ee4ddd;stop-opacity:0;"
-         offset="1"
-         id="stop21" />
-    </linearGradient>
     <clipPath
        id="screenClip">
       <rect
@@ -59,38 +46,11 @@
          rx="8"
          id="rect6" />
     </clipPath>
-    <radialGradient
-       inkscape:collect="always"
-       xlink:href="#linearGradient20"
-       id="radialGradient21"
-       cx="300"
-       cy="300"
-       fx="300"
-       fy="300"
-       r="260"
-       gradientUnits="userSpaceOnUse"
-       gradientTransform="matrix(0.92589274,0,0,0.92589274,22.232179,22.232179)" />
   </defs>
   <!-- Bottom bezel -->
-  <rect
-     style="display:inline;fill:#141824;fill-opacity:1;stroke-width:1.22947"
-     id="rect19"
-     width="688.50244"
-     height="688.50244"
-     x="55.748779"
-     y="-21.751221"
-     rx="184.4203"
-     ry="184.4203"
-     transform="matrix(0.81335949,0,0,0.81335949,-25.343796,37.691564)" />
-  <circle
-     style="fill:url(#radialGradient21);fill-opacity:1;stroke-width:0.925893"
-     id="path20"
-     cx="300"
-     cy="300"
-     r="240.73212" />
   <g
      id="g18"
-     transform="matrix(0.78812695,0,0,0.78812695,-15.250782,45.829057)">
+     transform="matrix(1.1016577,0,0,1.1016577,-140.66307,-55.284603)">
     <rect
        x="360"
        y="460"
@@ -101,21 +61,13 @@
        id="rect2" />
     <rect
        x="320"
-       y="515"
+       y="497.06924"
        width="160"
-       height="10"
+       height="27.930769"
        fill="#d0d0d0"
        rx="5"
-       id="rect3" />
-    <rect
-       x="140"
-       y="120"
-       width="520"
-       height="350"
-       fill="#e8e8e8"
-       rx="15"
-       id="rect4"
-       style="display:inline" />
+       id="rect3"
+       style="stroke-width:1.72471" />
     <g
        clip-path="url(#screenClip)"
        id="g17"
@@ -189,13 +141,10 @@
            sodipodi:nodetypes="cccc" />
       </g>
     </g>
-    <rect
-       x="150"
-       y="410"
-       width="500"
-       height="50"
-       fill="#e8e8e8"
+    <path
        id="rect17"
-       style="display:inline" />
+       style="display:inline;fill:#e8e8e8;fill-opacity:1;stroke-width:1.09012"
+       d="m 157.63795,121.55282 c -9.5433,0 -16.33901,7.34212 -16.33901,16.33901 v 312.25671 c 0,9.68737 8.51019,16.33901 16.33901,16.33901 h 484.72408 c 8.69362,0 16.33901,-6.59044 16.33901,-16.33901 V 137.89183 c 0,-9.41089 -6.31763,-16.33901 -16.33901,-16.33901 z m 5.95339,9.41763 h 472.8173 c 9.73382,0 12.70812,4.3132 12.70812,12.70812 V 408.18408 H 150.88322 V 143.67857 c 0,-6.64696 2.37667,-12.70812 12.70812,-12.70812 z"
+       sodipodi:nodetypes="ssssssssssssccss" />
   </g>
 </svg>

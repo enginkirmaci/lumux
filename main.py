@@ -10,12 +10,12 @@ from gui.main_window import MainWindow
 from lumux.app_context import AppContext
 
 # Get the app icon path (relative to this file)
-APP_ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "com.github.lumux.svg")
+APP_ICON_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "io.github.enginkirmaci.lumux.svg")
 
 
 class LumuxApp(Adw.Application):
     def __init__(self):
-        super().__init__(application_id='com.github.lumux',
+        super().__init__(application_id='io.github.enginkirmaci.lumux',
                          flags=Gio.ApplicationFlags.FLAGS_NONE)
         self.connect('activate', self.on_activate)
         self.main_window = None

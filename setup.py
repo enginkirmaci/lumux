@@ -11,6 +11,7 @@ setup(
     author="Lumux Team",
     license="MIT",
     packages=find_packages(),
+    py_modules=['main'],
     install_requires=[
         'python-hue-v2>=0.1.0',
         'numpy>=1.24.0',
@@ -23,9 +24,9 @@ setup(
     },
     data_files=[
         ('share/lumux/data', ['data/default_settings.json']),
-        ('share/applications', ['data/com.github.lumux.desktop']),
-        ('share/metainfo', ['data/com.github.lumux.metainfo.xml']),
-        ('share/icons/hicolor/scalable/apps', ['com.github.lumux.svg']),
+        ('share/applications', ['data/io.github.enginkirmaci.lumux.desktop']),
+        ('share/metainfo', ['data/io.github.enginkirmaci.lumux.metainfo.xml']),
+        ('share/icons/hicolor/scalable/apps', ['io.github.enginkirmaci.lumux.svg']),
     ],
     python_requires='>=3.10',
     classifiers=[

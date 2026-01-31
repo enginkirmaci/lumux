@@ -2,10 +2,10 @@
 Name=Lumux for Philips Hue Sync
 Comment=Real-time Philips Hue screen sync (Wayland portal capture)
 Exec=lumux
-Icon=com.github.lumux
+Icon=io.github.enginkirmaci.lumux
 Terminal=false
 Type=Application
 Categories=Utility;GTK;
 Keywords=hue;philips;lights;sync;screen;ambilight;
 StartupNotify=true
-StartupWMClass=com.github.lumux
+StartupWMClass=io.github.enginkirmaci.lumux

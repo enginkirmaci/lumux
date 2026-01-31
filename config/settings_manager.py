@@ -193,7 +193,7 @@ class SettingsManager:
         autostart_dir = Path.home() / '.config' / 'autostart'
         autostart_dir.mkdir(parents=True, exist_ok=True)
 
-        desktop_path = autostart_dir / 'com.github.lumux.desktop'
+        desktop_path = autostart_dir / 'io.github.enginkirmaci.lumux.desktop'
 
         # Attempt to determine a reasonable Exec line. Use sys.argv[0] if available.
         try:
@@ -225,7 +225,7 @@ NoDisplay=true
         if is_running_in_flatpak():
             return
 
-        desktop_path = Path.home() / '.config' / 'autostart' / 'com.github.lumux.desktop'
+        desktop_path = Path.home() / '.config' / 'autostart' / 'io.github.enginkirmaci.lumux.desktop'
         try:
             if desktop_path.exists():
                 desktop_path.unlink()

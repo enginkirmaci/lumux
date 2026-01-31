@@ -1,6 +1,6 @@
 app-id: io.github.enginkirmaci.lumux
 runtime: org.gnome.Platform
-runtime-version: "46"
+runtime-version: "49"
 sdk: org.gnome.Sdk
 command: lumux
 
@@ -15,7 +15,6 @@ finish-args:
   - --share=network
 
   # Screen capture via portals / PipeWire
-  - --talk-name=org.freedesktop.portal.Desktop
   - --filesystem=xdg-run/pipewire-0
 
 cleanup:
@@ -33,10 +32,12 @@ modules:
   - name: lumux
     buildsystem: simple
     build-commands:
-      - pip3 install --no-deps --prefix=/app .
+      - pip3 install --no-deps --no-build-isolation --prefix=/app .
       - install -Dm644 data/io.github.enginkirmaci.lumux.desktop /app/share/applications/io.github.enginkirmaci.lumux.desktop
       - install -Dm644 data/io.github.enginkirmaci.lumux.metainfo.xml /app/share/metainfo/io.github.enginkirmaci.lumux.metainfo.xml
       - install -Dm644 io.github.enginkirmaci.lumux.svg /app/share/icons/hicolor/scalable/apps/io.github.enginkirmaci.lumux.svg
     sources:
-      - type: dir
-        path: .
+      - type: git
+        url: https://github.com/enginkirmaci/lumux.git
+        tag: v0.1.0
+        commit: 1f263cfc75d210ef07802f32258d13c2d97b0a80

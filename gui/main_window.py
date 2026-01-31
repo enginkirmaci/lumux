@@ -323,10 +323,13 @@ class MainWindow(Adw.ApplicationWindow):
         """Show about dialog."""
         about = Adw.AboutDialog(
             application_name="Lumux for Philips Hue Sync",
-            application_icon="io.github.enginkirmaci.lumux",  # Uses icon from theme search path
+            application_icon="io.github.enginkirmaci.lumux",
             developer_name="Lumux Contributors",
             version="0.1.0",
-            comments="Sync your Philips Hue lights with your screen in real time.",
+            comments=("Sync your Philips Hue lights with your screen in real time. "
+                      "Lumux captures screen content, maps it to your configured entertainment "
+                      "zones on the Hue bridge, and streams low-latency color updates to create "
+                      "immersive ambient lighting.") ,
             license_type=Gtk.License.MIT_X11,
             website="https://github.com/enginkirmaci/lumux",
         )

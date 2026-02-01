@@ -6,9 +6,9 @@ from pathlib import Path
 
 setup(
     name="lumux",
-    version="0.1.0",
+    version="0.2.0",
     description="Lumux for Philips Hue Sync (Wayland)",
-    author="Lumux Team",
+    author="Engin KIRMACI",
     license="MIT",
     packages=find_packages(),
     py_modules=['main'],

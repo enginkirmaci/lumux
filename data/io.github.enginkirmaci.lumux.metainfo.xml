@@ -42,18 +42,13 @@
   <url type="bugtracker">https://github.com/enginkirmaci/lumux/issues</url>
   <url type="vcs-browser">https://github.com/enginkirmaci/lumux</url>
 
-  <branding>
-    <color type="primary" scheme_preference="dark">#FFA500</color>
-    <color type="primary" scheme_preference="light">#FF8C00</color>
-  </branding>
-
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.1.0/screenshots/screenshot1.png</image>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.2.0/screenshots/screenshot1.png</image>
       <caption>Main application window with zone preview</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.1.0/screenshots/screenshot2.png</image>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.2.0/screenshots/screenshot2.png</image>
       <caption>Settings and configuration</caption>
     </screenshot>
   </screenshots>
@@ -61,6 +56,16 @@
   <content_rating type="oars-1.1"/>
 
   <releases>
+    <release version="0.2.0" date="2026-02-01">
+      <description>
+        <p>New features and bug fixes:</p>
+        <ul>
+          <li>Added autostart at login support for Flatpak</li>
+          <li>Fixed config persistence in Flatpak sandbox (now uses XDG_CONFIG_HOME)</li>
+          <li>Improved settings management for sandboxed environments</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.1.0" date="2026-01-30">
       <description>
         <p>Initial release of Lumux for Philips Hue Sync.</p>

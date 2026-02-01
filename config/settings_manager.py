@@ -71,9 +71,20 @@ class SettingsManager:
 
     def _init(self):
         self._settings = Settings()
-        self._config_dir = Path.home() / '.config' / 'lumux'
+        self._config_dir = self._get_config_dir()
         self._settings_file = self._config_dir / 'settings.json'
         self._load_settings()
+
+    def _get_config_dir(self) -> Path:
+        """Get the config directory, respecting XDG dirs for Flatpak compatibility."""
+        if is_running_in_flatpak():
+            # In Flatpak, use XDG_CONFIG_HOME which is mapped to a persistent location
+            # Usually: ~/.var/app/io.github.enginkirmaci.lumux/config/
+            xdg_config = os.environ.get('XDG_CONFIG_HOME')
+            if xdg_config:
+                return Path(xdg_config) / 'lumux'
+        # Default: ~/.config/lumux
+        return Path.home() / '.config' / 'lumux'
 
     @classmethod
     def get_instance(cls) -> 'SettingsManager':

@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.enginkirmaci.lumux</id>
+  
+  <name>Lumux</name>
+  <summary>Philips Hue Sync for Wayland</summary>
+  
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  
+  <description>
+    <p>Real-time ambient lighting synchronization for Philips Hue lights on Linux (Wayland).</p>
+    <p>Lumux captures your screen and synchronizes the edge colors with your Philips Hue lights, creating an immersive ambilight experience for movies, games, and daily use.</p>
+    <p>Features:</p>
+    <ul>
+      <li>Real-time screen capture and color synchronization</li>
+      <li>Ambilight-style edge zone layout</li>
+      <li>GTK4 + libadwaita native interface</li>
+      <li>Configurable resolution scale and FPS for performance tuning</li>
+      <li>Entertainment streaming support for low-latency light updates</li>
+      <li>Smooth color transitions with configurable smoothing</li>
+      <li>Multi-monitor support (subject to compositor portal support)</li>
+      <li>System tray integration</li>
+      <li>Autostart at login</li>
+    </ul>
+  </description>
+  
+  <launchable type="desktop-id">io.github.enginkirmaci.lumux.desktop</launchable>
+  
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.2.0/screenshots/main-window.png</image>
+      <caption>Main window showing sync controls</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.2.0/screenshots/settings.png</image>
+      <caption>Settings dialog with bridge configuration</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.2.0/screenshots/zone-preview.png</image>
+      <caption>Zone preview showing ambilight layout</caption>
+    </screenshot>
+  </screenshots>
+  
+  <url type="homepage">https://github.com/enginkirmaci/lumux</url>
+  <url type="bugtracker">https://github.com/enginkirmaci/lumux/issues</url>
+  
+  <developer_name>Engin KIRMACI</developer_name>
+  <update_contact>enginkirmaci@outlook.com</update_contact>
+  
+  <content_rating type="oars-1.1" />
+  
+  <releases>
+    <release version="0.2.0" date="2026-02-01">
+      <description>
+        <p>New features and bug fixes:</p>
+        <ul>
+          <li>Added autostart at login support for Flatpak</li>
+          <li>Fixed config persistence in Flatpak sandbox (now uses XDG_CONFIG_HOME)</li>
+          <li>Improved settings management for sandboxed environments</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.1.0" date="2025-01-31">
+      <description>
+        <p>Initial release:</p>
+        <ul>
+          <li>Real-time screen capture and color synchronization</li>
+          <li>Ambilight-style edge zone layout</li>
+          <li>GTK4 + libadwaita native interface</li>
+          <li>Entertainment streaming support</li>
+          <li>System tray integration</li>
+        </ul>
+      </description>
+    </release>
+  </releases>
+</component>

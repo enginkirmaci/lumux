@@ -17,9 +17,6 @@ finish-args:
   # Screen capture via portals / PipeWire
   - --filesystem=xdg-run/pipewire-0:ro
 
-  # Autostart support - write desktop entry to ~/.config/autostart
-  - --filesystem=xdg-config/autostart:create
-
   # System tray support via StatusNotifierItem (D-Bus)
   - --talk-name=org.kde.StatusNotifierWatcher
   - --talk-name=org.freedesktop.StatusNotifierWatcher

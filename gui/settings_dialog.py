@@ -211,6 +211,44 @@ class SettingsDialog(Adw.PreferencesDialog):
         self.cols_row.set_value(self.settings.zones.cols)
         zones_group.add(self.cols_row)
 
+        # Black bar detection group
+        blackbar_group = Adw.PreferencesGroup()
+        blackbar_group.set_title("Black Bar Detection")
+        blackbar_group.set_description("Ignore letterbox/pillarbox bars in video content")
+        zones_page.add(blackbar_group)
+
+        # Enable black bar detection
+        self.blackbar_enable_row = Adw.SwitchRow()
+        self.blackbar_enable_row.set_title("Ignore Black Bars")
+        self.blackbar_enable_row.set_subtitle("Exclude black letterbox/pillarbox areas from color sampling")
+        try:
+            self.blackbar_enable_row.set_active(self.settings.zones.ignore_black_bars)
+        except Exception:
+            self.blackbar_enable_row.set_active(False)
+        blackbar_group.add(self.blackbar_enable_row)
+
+        # Detection threshold
+        self.blackbar_threshold_row = Adw.SpinRow.new_with_range(0, 50, 1)
+        self.blackbar_threshold_row.set_title("Detection Threshold")
+        self.blackbar_threshold_row.set_subtitle("Luminance below this is considered black (0-50)")
+        self.blackbar_threshold_row.set_digits(0)
+        try:
+            self.blackbar_threshold_row.set_value(self.settings.zones.black_bar_threshold)
+        except Exception:
+            self.blackbar_threshold_row.set_value(10)
+        blackbar_group.add(self.blackbar_threshold_row)
+
+        # Detection rate (frames)
+        self.blackbar_rate_row = Adw.SpinRow.new_with_range(1, 120, 1)
+        self.blackbar_rate_row.set_title("Detection Rate")
+        self.blackbar_rate_row.set_subtitle("Check for black bars every N frames")
+        self.blackbar_rate_row.set_digits(0)
+        try:
+            self.blackbar_rate_row.set_value(self.settings.zones.black_bar_detection_rate)
+        except Exception:
+            self.blackbar_rate_row.set_value(30)
+        blackbar_group.add(self.blackbar_rate_row)
+
         # Sync page
         sync_page = Adw.PreferencesPage()
         sync_page.set_title("Sync")
@@ -416,6 +454,19 @@ class SettingsDialog(Adw.PreferencesDialog):
             self.settings.zones.cols = int(self.cols_row.get_value())
         except Exception:
             self.settings.zones.cols = 16
+        # Black bar detection settings
+        try:
+            self.settings.zones.ignore_black_bars = bool(self.blackbar_enable_row.get_active())
+        except Exception:
+            self.settings.zones.ignore_black_bars = False
+        try:
+            self.settings.zones.black_bar_threshold = int(self.blackbar_threshold_row.get_value())
+        except Exception:
+            self.settings.zones.black_bar_threshold = 10
+        try:
+            self.settings.zones.black_bar_detection_rate = int(self.blackbar_rate_row.get_value())
+        except Exception:
+            self.settings.zones.black_bar_detection_rate = 30
         
         # Sync settings
         self.settings.sync.fps = int(self.fps_row.get_value())

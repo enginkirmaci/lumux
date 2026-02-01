@@ -5,30 +5,64 @@ from typing import Dict, Optional, TYPE_CHECKING
 
 import PIL.Image as Image
 
+from lumux.black_bar_detector import BlackBarDetector, CropRegion
+
 if TYPE_CHECKING:
     from config.settings_manager import ZoneSettings
 
 
 class ZoneProcessor:
     def __init__(self, rows: int = 16, cols: int = 16, settings: Optional["ZoneSettings"] = None):
+        self.settings = settings
         if settings is not None:
             self.rows = settings.rows
             self.cols = settings.cols
+            # Initialize black bar detector if enabled
+            if getattr(settings, 'ignore_black_bars', False):
+                self._black_bar_detector = BlackBarDetector(
+                    threshold=getattr(settings, 'black_bar_threshold', 10),
+                    min_size_percent=5.0
+                )
+            else:
+                self._black_bar_detector = None
         else:
             self.rows = rows
             self.cols = cols
+            self._black_bar_detector = None
+        self._current_crop: Optional[CropRegion] = None
         self.zones: Dict[str, tuple[int, int, int]] = {}
 
-    def process_image(self, image: Image.Image) -> Dict[str, tuple[int, int, int]]:
+    def process_image(self, image: Image.Image, apply_black_bar_crop: bool = True) -> Dict[str, tuple[int, int, int]]:
         """Process image and return zone colors.
 
         Args:
             image: PIL Image to process
+            apply_black_bar_crop: Whether to apply black bar crop before processing
 
         Returns:
             Dictionary mapping zone IDs to RGB tuples
         """
+        # Apply black bar crop if enabled and available
+        if apply_black_bar_crop and self._current_crop is not None and self._current_crop.has_crop:
+            image = self._current_crop.apply_to_image(image)
         return self._process_ambilight(image)
+
+    def update_black_bar_crop(self, crop: CropRegion, smoothing_factor: float = 0.3):
+        """Update the current black bar crop region with smoothing.
+
+        Args:
+            crop: Newly detected crop region
+            smoothing_factor: Smoothing factor (0.0 = no change, 1.0 = immediate)
+        """
+        if self._black_bar_detector is not None:
+            self._current_crop = self._black_bar_detector.smooth_crop(crop, smoothing_factor)
+        else:
+            self._current_crop = crop
+
+    @property
+    def current_crop(self) -> Optional[CropRegion]:
+        """Get current black bar crop region."""
+        return self._current_crop
 
     def _process_ambilight(self, image: Image.Image) -> Dict[str, tuple[int, int, int]]:
         """Process only edge zones (top, bottom, left, right)."""

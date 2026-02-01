@@ -34,6 +34,10 @@ class ZoneSettings:
     show_preview: bool = True
     rows: int = 16
     cols: int = 16
+    # Black bar detection settings
+    ignore_black_bars: bool = False
+    black_bar_threshold: int = 10  # 0-255, luminance threshold
+    black_bar_detection_rate: int = 30  # Check every N frames
 
 
 @dataclass
@@ -121,7 +125,16 @@ class SettingsManager:
                 self._settings.hue = HueSettings(**data.get('hue', {}))
                 self._settings.capture = CaptureSettings(**data.get('capture', {}))
                 # Ensure we pass show_preview through when present
-                self._settings.zones = ZoneSettings(**data.get('zones', {}))
+                # Zone settings with black bar detection
+                zones_data = data.get('zones', {})
+                self._settings.zones = ZoneSettings(**zones_data)
+                # Ensure black bar settings exist even in old configs
+                if 'ignore_black_bars' not in zones_data:
+                    self._settings.zones.ignore_black_bars = False
+                if 'black_bar_threshold' not in zones_data:
+                    self._settings.zones.black_bar_threshold = 10
+                if 'black_bar_detection_rate' not in zones_data:
+                    self._settings.zones.black_bar_detection_rate = 30
                 self._settings.sync = SyncSettings(**data.get('sync', {}))
                 # UI settings (optional)
                 self._settings.ui = UISettings(**data.get('ui', {}))
@@ -169,6 +182,22 @@ class SettingsManager:
 
         self._settings.zones.rows = max(1, min(64, self._settings.zones.rows))
         self._settings.zones.cols = max(1, min(64, self._settings.zones.cols))
+
+        # Black bar detection validation
+        try:
+            self._settings.zones.ignore_black_bars = bool(self._settings.zones.ignore_black_bars)
+        except Exception:
+            self._settings.zones.ignore_black_bars = False
+        try:
+            self._settings.zones.black_bar_threshold = int(self._settings.zones.black_bar_threshold)
+        except Exception:
+            self._settings.zones.black_bar_threshold = 10
+        self._settings.zones.black_bar_threshold = max(0, min(255, self._settings.zones.black_bar_threshold))
+        try:
+            self._settings.zones.black_bar_detection_rate = int(self._settings.zones.black_bar_detection_rate)
+        except Exception:
+            self._settings.zones.black_bar_detection_rate = 30
+        self._settings.zones.black_bar_detection_rate = max(1, min(300, self._settings.zones.black_bar_detection_rate))
 
         # UI settings validation
         try:

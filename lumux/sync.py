@@ -16,6 +16,7 @@ from lumux.capture import ScreenCapture
 from lumux.zones import ZoneProcessor
 from lumux.colors import ColorAnalyzer
 from lumux.entertainment import EntertainmentStream
+from lumux.black_bar_detector import BlackBarDetector
 from config.zone_mapping import ZoneMapping
 
 
@@ -41,12 +42,27 @@ class SyncController:
         # Zone to channel mapping for entertainment streaming
         self._zone_channel_map: Dict[str, int] = {}
 
+        # Black bar detection
+        self._black_bar_detector: Optional[BlackBarDetector] = None
+        self._frame_counter = 0
+        self._init_black_bar_detector()
+
         self._stats = {
             'fps': 0,
             'frame_count': 0,
             'errors': 0,
             'last_update': time.time()
         }
+
+    def _init_black_bar_detector(self):
+        """Initialize black bar detector if enabled in settings."""
+        zone_settings = getattr(self.settings, 'zones', None)
+        if zone_settings and getattr(zone_settings, 'ignore_black_bars', False):
+            threshold = getattr(zone_settings, 'black_bar_threshold', 10)
+            self._black_bar_detector = BlackBarDetector(threshold=threshold, min_size_percent=5.0)
+            _timed_print(f"Black bar detection enabled (threshold={threshold})")
+        else:
+            self._black_bar_detector = None
 
     def start(self):
         """Start sync thread."""
@@ -226,6 +242,14 @@ class SyncController:
         t_capture = time.time() - t_capture
         if not screen:
             return
+
+        # Black bar detection (runs periodically)
+        self._frame_counter += 1
+        if self._black_bar_detector is not None:
+            detection_rate = getattr(self.settings.zones, 'black_bar_detection_rate', 30)
+            if self._frame_counter % detection_rate == 0:
+                crop = self._black_bar_detector.detect(screen)
+                self.zone_processor.update_black_bar_crop(crop, smoothing_factor=self.settings.smoothing_factor)
 
         t_zones = time.time()
         zone_colors = self.zone_processor.process_image(screen)

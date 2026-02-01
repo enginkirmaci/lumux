@@ -4,6 +4,7 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw
+from pathlib import Path
 from lumux.bridge import HueBridge
 from lumux.app_context import AppContext
 from config.settings_manager import is_running_in_flatpak
@@ -126,16 +127,27 @@ class SettingsDialog(Adw.PreferencesDialog):
         general_page.add(general_group)
 
         # Start at startup
-        if not is_running_in_flatpak():
-            self.startup_row = Adw.SwitchRow()
-            self.startup_row.set_title("Start at Login")
+        self.startup_row = Adw.SwitchRow()
+        self.startup_row.set_title("Start at Login")
+        
+        # Get current autostart status
+        is_autostart_enabled = self.settings.is_autostart_enabled()
+        self.startup_row.set_active(is_autostart_enabled)
+        
+        # Set subtitle based on Flatpak status
+        if is_running_in_flatpak():
+            # Check if we have host filesystem access
+            autostart_dir = Path.home() / '.config' / 'autostart'
+            if autostart_dir.exists():
+                self.startup_row.set_subtitle("Launch Lumux when you log in (Flatpak with host access)")
+            else:
+                self.startup_row.set_subtitle("Launch Lumux when you log in (requires filesystem=host permission)")
+        else:
             self.startup_row.set_subtitle("Launch Lumux when you log in")
-            # If settings manager exposes ui property
-            try:
-                self.startup_row.set_active(self.settings.ui.start_at_startup)
-            except Exception:
-                self.startup_row.set_active(False)
-            general_group.add(self.startup_row)
+        
+        # Connect to notify::active for immediate action
+        self.startup_row.connect("notify::active", self._on_startup_toggled)
+        general_group.add(self.startup_row)
 
         # Minimize to tray when sync starts
         self.minimize_row = Adw.SwitchRow()
@@ -346,6 +358,34 @@ class SettingsDialog(Adw.PreferencesDialog):
         """Refresh entertainment configuration list."""
         self._load_entertainment_configs()
 
+    def _on_startup_toggled(self, switch, pspec):
+        """Handle startup toggle change immediately."""
+        state = switch.get_active()
+        if state:
+            result = self.settings.enable_autostart()
+            if not result and is_running_in_flatpak():
+                # Show a toast or update subtitle if failed in Flatpak
+                self.startup_row.set_subtitle("Failed to enable. Run: flatpak override --user --filesystem=host io.github.enginkirmaci.lumux")
+                # Revert the switch
+                switch.set_active(False)
+            else:
+                self.settings.ui.start_at_startup = True
+                if is_running_in_flatpak():
+                    self.startup_row.set_subtitle("Launch Lumux when you log in (autostart enabled)")
+                else:
+                    self.startup_row.set_subtitle("Launch Lumux when you log in")
+        else:
+            self.settings.disable_autostart()
+            self.settings.ui.start_at_startup = False
+            if is_running_in_flatpak():
+                autostart_dir = Path.home() / '.config' / 'autostart'
+                if autostart_dir.exists():
+                    self.startup_row.set_subtitle("Launch Lumux when you log in (Flatpak with host access)")
+                else:
+                    self.startup_row.set_subtitle("Launch Lumux when you log in (requires filesystem=host permission)")
+            else:
+                self.startup_row.set_subtitle("Launch Lumux when you log in")
+
     def _on_closed(self, dialog):
         """Handle dialog close - save settings."""
         self._save_settings()
@@ -383,21 +423,11 @@ class SettingsDialog(Adw.PreferencesDialog):
         self.settings.sync.brightness_scale = self.brightness_row.get_value()
         self.settings.sync.gamma = self.gamma_row.get_value()
         self.settings.sync.smoothing_factor = self.smoothing_row.get_value()
-        # UI settings
+        # UI settings - startup is handled immediately in _on_startup_toggled
+        # but we ensure the setting matches the current state
         if hasattr(self, "startup_row"):
             try:
                 self.settings.ui.start_at_startup = bool(self.startup_row.get_active())
-                # Enable/disable autostart file
-                if self.settings.ui.start_at_startup:
-                    try:
-                        self.settings.enable_autostart()
-                    except Exception:
-                        pass
-                else:
-                    try:
-                        self.settings.disable_autostart()
-                    except Exception:
-                        pass
             except Exception:
                 pass
 

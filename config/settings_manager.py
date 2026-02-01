@@ -186,48 +186,80 @@ class SettingsManager:
 
     def enable_autostart(self):
         """Create a .desktop file in ~/.config/autostart to start the app at login (Linux)."""
-        if is_running_in_flatpak():
-            # Flatpak apps cannot write host autostart entries from inside the sandbox.
-            return
-
         autostart_dir = Path.home() / '.config' / 'autostart'
         autostart_dir.mkdir(parents=True, exist_ok=True)
 
         desktop_path = autostart_dir / 'io.github.enginkirmaci.lumux.desktop'
 
-        # Attempt to determine a reasonable Exec line. Use sys.argv[0] if available.
-        try:
-            exe = shlex.quote(sys.executable)
-            script = os.path.abspath(sys.argv[0]) if len(sys.argv) > 0 else ''
-            if script:
-                exec_cmd = f"{exe} {shlex.quote(script)}"
-            else:
-                exec_cmd = exe
-        except Exception:
-            exec_cmd = shlex.quote(sys.executable)
+        if is_running_in_flatpak():
+            # For Flatpak, use the flatpak run command
+            exec_cmd = "flatpak run io.github.enginkirmaci.lumux"
+        else:
+            # For regular install, attempt to determine a reasonable Exec line
+            try:
+                exe = shlex.quote(sys.executable)
+                script = os.path.abspath(sys.argv[0]) if len(sys.argv) > 0 else ''
+                if script:
+                    exec_cmd = f"{exe} {shlex.quote(script)}"
+                else:
+                    exec_cmd = exe
+            except Exception:
+                exec_cmd = shlex.quote(sys.executable)
 
         content = f"""[Desktop Entry]
 Type=Application
-    Name=Lumux for Philips Hue Sync
+Name=Lumux for Philips Hue Sync
 Exec={exec_cmd}
+Icon=io.github.enginkirmaci.lumux
+Terminal=false
 X-GNOME-Autostart-enabled=true
-NoDisplay=true
+NoDisplay=false
 """
 
         try:
             with open(desktop_path, 'w') as f:
                 f.write(content)
+            return True
         except Exception as e:
             print(f"Failed to write autostart file: {e}")
+            return False
 
     def disable_autostart(self):
         """Remove autostart .desktop file if present."""
-        if is_running_in_flatpak():
-            return
-
         desktop_path = Path.home() / '.config' / 'autostart' / 'io.github.enginkirmaci.lumux.desktop'
         try:
             if desktop_path.exists():
                 desktop_path.unlink()
+                return True
+            return True  # Already disabled
         except Exception as e:
             print(f"Failed to remove autostart file: {e}")
+            return False
+
+    def is_autostart_enabled(self) -> bool:
+        """Check if autostart is enabled by looking for the .desktop file."""
+        desktop_path = Path.home() / '.config' / 'autostart' / 'io.github.enginkirmaci.lumux.desktop'
+        return desktop_path.exists()
+
+    def get_autostart_status(self) -> tuple[bool, str]:
+        """Get autostart status and a message explaining the current state.
+        
+        Returns:
+            Tuple of (is_enabled, status_message)
+        """
+        is_enabled = self.is_autostart_enabled()
+        
+        if is_running_in_flatpak():
+            # For Flatpak, check if we can access the host autostart directory
+            autostart_dir = Path.home() / '.config' / 'autostart'
+            if not autostart_dir.exists():
+                # Flatpak without proper filesystem access
+                if is_enabled:
+                    return True, "Autostart enabled (Flatpak with host access)"
+                else:
+                    return False, "Manual setup required: Flatpak apps need filesystem=host permission to enable autostart automatically. Run: flatpak override --user --filesystem=host io.github.enginkirmaci.lumux"
+        
+        if is_enabled:
+            return True, "Autostart enabled"
+        else:
+            return False, "Autostart disabled"

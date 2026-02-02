@@ -49,18 +49,6 @@ From source
 Editable install
 - pip install -e .
 
-Desktop integration (optional)
-To install the desktop entry and icon system-wide (may require adjusting paths):
-sudo mkdir -p /usr/share/icons/hicolor/scalable/apps
-sudo cp io.github.enginkirmaci.lumux.svg /usr/share/icons/hicolor/scalable/apps/io.github.enginkirmaci.lumux.svg
-sudo cp data/io.github.enginkirmaci.lumux.desktop /usr/share/applications/
-sudo update-desktop-database /usr/share/applications
-sudo gtk-update-icon-cache -f /usr/share/icons/hicolor
-
-If gtk-update-icon-cache complains about missing index.theme:
-printf '[Icon Theme]\nName=hicolor\n' | sudo tee /usr/share/icons/hicolor/index.theme > /dev/null
-sudo gtk-update-icon-cache -f /usr/share/icons/hicolor
-
 Usage
 
 First time setup
@@ -106,33 +94,6 @@ Bridge connection issues
 
 High CPU usage
 - Lower FPS and resolution scale in settings
-
-Development
-
-Project layout (representative)
-lumux/
-├── main.py                 # Application entry point
-├── lumux/
-│   └── app_context.py      # App context and bootstrapping
-├── hue_sync/               # Core sync modules
-│   ├── bridge.py
-│   ├── capture.py
-│   ├── zones.py
-│   ├── colors.py
-│   └── sync.py
-├── gui/                    # GTK4 interface
-│   ├── main_window.py
-│   ├── settings_dialog.py
-│   ├── zone_preview_widget.py
-│   └── tray_icon.py
-├── config/
-│   ├── settings_manager.py
-├── utils/
-│   └── rgb_xy_converter.py
-├── data/
-├── requirements.txt
-├── setup.py
-└── README.md
 
 Contributing
 Contributions welcome. Please open issues and pull requests. If you plan large changes, open an issue first to discuss.

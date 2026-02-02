@@ -8,7 +8,7 @@ setup(
     name="lumux",
     version="0.2.0",
     description="Lumux for Philips Hue Sync (Wayland)",
-    author="Engin KIRMACI",
+    author="Engin Kırmacı",
     license="MIT",
     packages=find_packages(),
     py_modules=['main'],

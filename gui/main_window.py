@@ -324,7 +324,7 @@ class MainWindow(Adw.ApplicationWindow):
         about = Adw.AboutDialog(
             application_name="Lumux for Philips Hue Sync",
             application_icon="io.github.enginkirmaci.lumux",
-            developer_name="Lumux Contributors",
+            developer_name="Engin Kırmacı",
             version="0.2.0",
             comments=("Sync your Philips Hue lights with your screen in real time. "
                       "Lumux captures screen content, maps it to your configured entertainment "

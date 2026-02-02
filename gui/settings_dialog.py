@@ -178,6 +178,35 @@ class SettingsDialog(Adw.PreferencesDialog):
         self.scale_row.set_value(self.settings.capture.scale_factor)
         capture_group.add(self.scale_row)
 
+        # Black bar detection group
+        blackbar_group = Adw.PreferencesGroup()
+        blackbar_group.set_title("Black Bar Detection")
+        blackbar_group.set_description("Automatically detect and ignore letterbox/pillarbox bars")
+        capture_page.add(blackbar_group)
+
+        # Enable black bar detection
+        self.blackbar_enable_row = Adw.SwitchRow()
+        self.blackbar_enable_row.set_title("Enable Detection")
+        self.blackbar_enable_row.set_subtitle("Ignore black bars around video content")
+        self.blackbar_enable_row.set_active(self.settings.black_bar.enabled)
+        blackbar_group.add(self.blackbar_enable_row)
+
+        # Threshold
+        self.blackbar_threshold_row = Adw.SpinRow.new_with_range(0, 50, 1)
+        self.blackbar_threshold_row.set_title("Luminance Threshold")
+        self.blackbar_threshold_row.set_subtitle("Brightness level considered black (0-50)")
+        self.blackbar_threshold_row.set_digits(0)
+        self.blackbar_threshold_row.set_value(self.settings.black_bar.threshold)
+        blackbar_group.add(self.blackbar_threshold_row)
+
+        # Detection rate
+        self.blackbar_rate_row = Adw.SpinRow.new_with_range(1, 120, 1)
+        self.blackbar_rate_row.set_title("Detection Rate")
+        self.blackbar_rate_row.set_subtitle("Run detection every N frames (1-120)")
+        self.blackbar_rate_row.set_digits(0)
+        self.blackbar_rate_row.set_value(self.settings.black_bar.detection_rate)
+        blackbar_group.add(self.blackbar_rate_row)
+
         # Zones page
         zones_page = Adw.PreferencesPage()
         zones_page.set_title("Zones")
@@ -404,6 +433,20 @@ class SettingsDialog(Adw.PreferencesDialog):
             self.settings.hue.entertainment_config_id = ""
         
         self.settings.capture.scale_factor = self.scale_row.get_value()
+        
+        # Black bar settings
+        try:
+            self.settings.black_bar.enabled = bool(self.blackbar_enable_row.get_active())
+        except Exception:
+            self.settings.black_bar.enabled = False
+        try:
+            self.settings.black_bar.threshold = int(self.blackbar_threshold_row.get_value())
+        except Exception:
+            self.settings.black_bar.threshold = 10
+        try:
+            self.settings.black_bar.detection_rate = int(self.blackbar_rate_row.get_value())
+        except Exception:
+            self.settings.black_bar.detection_rate = 30
         
         # Zone settings
         self.settings.zones.show_preview = self.preview_row.get_active()

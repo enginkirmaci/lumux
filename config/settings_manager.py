@@ -52,12 +52,21 @@ class UISettings:
 
 
 @dataclass
+class BlackBarSettings:
+    enabled: bool = False
+    threshold: int = 10
+    detection_rate: int = 30
+    smooth_factor: float = 0.3
+
+
+@dataclass
 class Settings:
     hue: HueSettings = field(default_factory=HueSettings)
     capture: CaptureSettings = field(default_factory=CaptureSettings)
     zones: ZoneSettings = field(default_factory=ZoneSettings)
     sync: SyncSettings = field(default_factory=SyncSettings)
     ui: UISettings = field(default_factory=UISettings)
+    black_bar: BlackBarSettings = field(default_factory=BlackBarSettings)
 
 
 class SettingsManager:
@@ -114,6 +123,10 @@ class SettingsManager:
     def ui(self):
         return self._settings.ui
 
+    @property
+    def black_bar(self) -> BlackBarSettings:
+        return self._settings.black_bar
+
     def get_zone_mapping(self) -> ZoneMapping:
         """Return a ZoneMapping instance stored in the config directory.
 
@@ -136,6 +149,8 @@ class SettingsManager:
                 self._settings.sync = SyncSettings(**data.get('sync', {}))
                 # UI settings (optional)
                 self._settings.ui = UISettings(**data.get('ui', {}))
+                # Black bar settings (optional)
+                self._settings.black_bar = BlackBarSettings(**data.get('black_bar', {}))
             except (json.JSONDecodeError, TypeError) as e:
                 print(f"Error loading settings: {e}")
                 self._validate_settings()
@@ -152,9 +167,9 @@ class SettingsManager:
             'hue': asdict(self._settings.hue),
             'capture': asdict(self._settings.capture),
             'zones': asdict(self._settings.zones),
-            'sync': asdict(self._settings.sync)
-            ,
-            'ui': asdict(self._settings.ui)
+            'sync': asdict(self._settings.sync),
+            'ui': asdict(self._settings.ui),
+            'black_bar': asdict(self._settings.black_bar)
         }
 
         with open(self._settings_file, 'w') as f:
@@ -190,6 +205,28 @@ class SettingsManager:
             self._settings.ui.minimize_to_tray_on_sync = bool(self._settings.ui.minimize_to_tray_on_sync)
         except Exception:
             self._settings.ui.minimize_to_tray_on_sync = False
+
+        # Black bar settings validation
+        try:
+            self._settings.black_bar.enabled = bool(self._settings.black_bar.enabled)
+        except Exception:
+            self._settings.black_bar.enabled = False
+        try:
+            self._settings.black_bar.threshold = int(self._settings.black_bar.threshold)
+        except Exception:
+            self._settings.black_bar.threshold = 10
+        try:
+            self._settings.black_bar.detection_rate = int(self._settings.black_bar.detection_rate)
+        except Exception:
+            self._settings.black_bar.detection_rate = 30
+        try:
+            self._settings.black_bar.smooth_factor = float(self._settings.black_bar.smooth_factor)
+        except Exception:
+            self._settings.black_bar.smooth_factor = 0.3
+
+        self._settings.black_bar.threshold = max(0, min(50, self._settings.black_bar.threshold))
+        self._settings.black_bar.detection_rate = max(1, min(120, self._settings.black_bar.detection_rate))
+        self._settings.black_bar.smooth_factor = max(0.1, min(1.0, self._settings.black_bar.smooth_factor))
 
     def _ensure_config_dir(self):
         """Ensure config directory exists."""

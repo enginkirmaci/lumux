@@ -33,6 +33,10 @@ class ZoneProcessor:
     def _process_ambilight(self, image: Image.Image) -> Dict[str, tuple[int, int, int]]:
         """Process only edge zones (top, bottom, left, right)."""
         try:
+            # Safety check for valid image dimensions
+            if image is None or image.width <= 0 or image.height <= 0:
+                return {}
+            
             img_array = np.array(image)
             
             if len(img_array.shape) == 2:
@@ -42,6 +46,10 @@ class ZoneProcessor:
 
             zones = {}
             height, width = img_array.shape[0], img_array.shape[1]
+            
+            # Minimum dimensions check
+            if height < 2 or width < 2:
+                return {}
             
             edge_width = min(width // self.cols, height // 8)
             edge_width = max(edge_width, 5)

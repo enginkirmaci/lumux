@@ -3,7 +3,7 @@
 import time
 import os
 import threading
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 
 import PIL.Image as Image
 
@@ -12,11 +12,16 @@ gi.require_version('Gst', '1.0')
 gi.require_version('GstApp', '1.0')
 from gi.repository import GLib, Gst, GstApp
 
+from lumux.black_bar_detector import BlackBarDetector
+
+if TYPE_CHECKING:
+    from config.settings_manager import BlackBarSettings
+
 Gst.init(None)
 
 
 class ScreenCapture:
-    def __init__(self, scale_factor: float = 0.125):
+    def __init__(self, scale_factor: float = 0.125, black_bar_settings: Optional["BlackBarSettings"] = None):
         self.scale_factor = scale_factor
         self._display = None
         
@@ -31,7 +36,41 @@ class ScreenCapture:
         self._frame_lock = threading.Lock()
         self._pipeline_running = False
         
+        # Black bar detector for letterbox/pillarbox removal
+        self._black_bar_detector: Optional[BlackBarDetector] = None
+        if black_bar_settings is not None:
+            self._init_black_bar_detector(black_bar_settings)
+        
         self._init_display()
+    
+    def _init_black_bar_detector(self, settings: "BlackBarSettings") -> None:
+        """Initialize black bar detector from settings."""
+        self._black_bar_detector = BlackBarDetector(
+            enabled=settings.enabled,
+            threshold=settings.threshold,
+            detection_rate=settings.detection_rate,
+            smooth_factor=settings.smooth_factor
+        )
+    
+    def update_black_bar_settings(self, settings: "BlackBarSettings") -> None:
+        """Update black bar detector settings dynamically."""
+        if self._black_bar_detector is None:
+            self._init_black_bar_detector(settings)
+        else:
+            self._black_bar_detector.set_enabled(settings.enabled)
+            self._black_bar_detector.set_threshold(settings.threshold)
+            self._black_bar_detector.set_detection_rate(settings.detection_rate)
+            self._black_bar_detector.smooth_factor = settings.smooth_factor
+    
+    def get_black_bar_crop_region(self):
+        """Get current black bar crop region (for zone processing alignment).
+        
+        Returns:
+            CropRegion or None if no cropping applied
+        """
+        if self._black_bar_detector is None:
+            return None
+        return self._black_bar_detector.get_crop_region()
 
     def _init_display(self):
         """Initialize Gdk display for monitor info."""
@@ -74,12 +113,28 @@ class ScreenCapture:
         return None
 
     def _process_image(self, screen: Image.Image) -> Image.Image:
-        """Apply scaling to image if needed."""
+        """Apply scaling and black bar detection to image if needed."""
+        # Safety check for invalid input
+        if screen is None or screen.width <= 0 or screen.height <= 0:
+            return screen
+        
+        # Apply black bar detection first (on full resolution for accuracy)
+        if self._black_bar_detector is not None:
+            try:
+                screen = self._black_bar_detector.process(screen)
+            except Exception as e:
+                print(f"Black bar detection error: {e}")
+                # Continue with original image on error
+        
+        # Safety check after black bar processing
+        if screen is None or screen.width <= 0 or screen.height <= 0:
+            return screen
+        
         # Apply Scaling - use BILINEAR for speed (LANCZOS is too slow)
         if self.scale_factor < 1.0:
             new_size = (
-                int(screen.width * self.scale_factor),
-                int(screen.height * self.scale_factor)
+                max(1, int(screen.width * self.scale_factor)),
+                max(1, int(screen.height * self.scale_factor))
             )
             screen = screen.resize(new_size, Image.Resampling.BILINEAR)
         return screen

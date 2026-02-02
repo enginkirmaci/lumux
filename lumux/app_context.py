@@ -28,6 +28,7 @@ class AppContext:
         self.bridge = HueBridge(settings.hue.bridge_ip, settings.hue.app_key)
         self.capture = ScreenCapture(
             scale_factor=settings.capture.scale_factor,
+            black_bar_settings=settings.black_bar,
         )
         self.zone_processor = ZoneProcessor(settings=settings.zones)
         self.color_analyzer = ColorAnalyzer(
@@ -96,6 +97,9 @@ class AppContext:
 
         capture = self.settings.capture
         self.capture.scale_factor = capture.scale_factor
+
+        # Update black bar detector settings
+        self.capture.update_black_bar_settings(self.settings.black_bar)
 
         self.color_analyzer.brightness_scale = self.settings.sync.brightness_scale
         self.color_analyzer.gamma = self.settings.sync.gamma

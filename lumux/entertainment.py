@@ -79,7 +79,7 @@ class EntertainmentStream:
             self._parse_channels(config)
 
             # Get hue-application-id for PSK identity
-            self._application_id = self._get_application_id()
+            self._application_id = self._get_application_id(bridge)
             if not self._application_id:
                 _timed_print("Warning: Could not get hue-application-id, falling back to app_key")
                 self._application_id = self.app_key
@@ -108,26 +108,13 @@ class EntertainmentStream:
             print(f"Error connecting entertainment stream: {e}")
             return False
 
-    def _get_application_id(self) -> Optional[str]:
+    def _get_application_id(self, bridge: 'HueBridge') -> Optional[str]:
         """Get hue-application-id from /auth/v1 endpoint.
         
         This is the correct PSK identity for DTLS connection per official API docs.
         """
-        import ssl
-        import urllib.request
-        
         try:
-            ctx = ssl.create_default_context()
-            ctx.check_hostname = False
-            ctx.verify_mode = ssl.CERT_NONE
-            
-            url = f"https://{self.bridge_ip}/auth/v1"
-            req = urllib.request.Request(url, method='GET')
-            req.add_header('hue-application-key', self.app_key)
-            
-            resp = urllib.request.urlopen(req, context=ctx, timeout=5)
-            headers = dict(resp.headers)
-            return headers.get('hue-application-id')
+            return bridge.get_application_id()
         except Exception as e:
             _timed_print(f"Error getting application ID: {e}")
             return None

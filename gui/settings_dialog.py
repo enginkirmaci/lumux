@@ -8,6 +8,7 @@ from pathlib import Path
 from lumux.bridge import HueBridge
 from lumux.app_context import AppContext
 from config.settings_manager import is_running_in_flatpak
+from gui.bridge_wizard import BridgeWizard
 
 
 class SettingsDialog(Adw.PreferencesDialog):
@@ -70,23 +71,17 @@ class SettingsDialog(Adw.PreferencesDialog):
         self.client_key_row.set_text(self.settings.hue.client_key)
         connection_group.add(self.client_key_row)
 
-        # Action buttons row
-        actions_row = Adw.ActionRow()
-        actions_row.set_title("Bridge Actions")
-        actions_row.set_subtitle("Discover bridges on network or authenticate")
+        # Wizard setup row
+        wizard_row = Adw.ActionRow()
+        wizard_row.set_title("Bridge Setup")
+        wizard_row.set_subtitle("Launch wizard to discover and configure bridge")
         
-        discover_btn = Gtk.Button(label="Discover")
-        discover_btn.add_css_class("flat")
-        discover_btn.set_valign(Gtk.Align.CENTER)
-        discover_btn.connect("clicked", self._on_discover)
-        actions_row.add_suffix(discover_btn)
-        
-        auth_btn = Gtk.Button(label="Authenticate")
-        auth_btn.add_css_class("suggested-action")
-        auth_btn.set_valign(Gtk.Align.CENTER)
-        auth_btn.connect("clicked", self._on_authenticate)
-        actions_row.add_suffix(auth_btn)
-        connection_group.add(actions_row)
+        wizard_btn = Gtk.Button(label="Setup Bridge")
+        wizard_btn.add_css_class("suggested-action")
+        wizard_btn.set_valign(Gtk.Align.CENTER)
+        wizard_btn.connect("clicked", self._on_start_wizard)
+        wizard_row.add_suffix(wizard_btn)
+        connection_group.add(wizard_row)
 
         # Entertainment group
         ent_group = Adw.PreferencesGroup()
@@ -298,44 +293,44 @@ class SettingsDialog(Adw.PreferencesDialog):
         # Connect close signal to save settings
         self.connect("closed", self._on_closed)
 
-    def _on_discover(self, button):
-        """Discover Hue bridges on network."""
-        self.discovered_bridges = HueBridge.discover_bridges()
-        
-        if self.discovered_bridges:
-            self.ip_row.set_text(self.discovered_bridges[0])
-            self.status_row.set_subtitle(f"Found {len(self.discovered_bridges)} bridge(s)")
-        else:
-            self.status_row.set_subtitle("No bridges found")
+    def _on_start_wizard(self, button):
+        """Launch the bridge setup wizard."""
+        wizard = BridgeWizard(
+            app_context=self.settings,
+            on_finished=self._on_wizard_finished
+        )
+        wizard.connect('finished', self._on_wizard_close)
+        wizard.connect('cancelled', self._on_wizard_close)
+        self.push_subpage(wizard)
+    
+    def _on_wizard_close(self, wizard):
+        """Close the wizard and return to settings."""
+        self.pop_subpage()
 
-    def _on_authenticate(self, button):
-        """Authenticate with Hue bridge."""
-        ip = self.ip_row.get_text()
+    def _on_wizard_finished(self, bridge_ip: str, app_key: str, client_key: str, entertainment_config_id: str):
+        """Called when wizard is completed successfully."""
+        # Save settings
+        self.settings.hue.bridge_ip = bridge_ip
+        self.settings.hue.app_key = app_key
+        self.settings.hue.client_key = client_key
+        self.settings.hue.entertainment_config_id = entertainment_config_id
         
-        if not ip:
-            self.status_row.set_subtitle("Please enter bridge IP")
-            return
-
-        self.status_row.set_subtitle("Press link button on bridge...")
-
-        result = self.bridge.create_user(ip)
+        # Persist settings to disk
+        self.settings.save()
         
-        if result:
-            app_key = result.get('app_key', '')
-            client_key = result.get('client_key', '')
-            self.key_row.set_text(app_key)
-            self.client_key_row.set_text(client_key)
-            # Connect to bridge with new credentials
-            if self.bridge.connect():
-                self.status_row.set_subtitle("Authenticated and connected!")
-                self.status_icon.set_from_icon_name("network-transmit-receive-symbolic")
-                self._update_bridge_status()
-                # Refresh entertainment configs after authentication
-                self._load_entertainment_configs()
-            else:
-                self.status_row.set_subtitle("Authenticated but connection failed")
-        else:
-            self.status_row.set_subtitle("Press the bridge button first, then try again")
+        # Apply settings to live components (recreates entertainment stream)
+        self.app_context.apply_settings()
+        
+        # Update UI with new settings
+        self.ip_row.set_text(bridge_ip)
+        self.key_row.set_text(app_key)
+        self.client_key_row.set_text(client_key)
+        
+        # Update status
+        self._update_bridge_status()
+        
+        # Refresh entertainment zones
+        self._load_entertainment_configs()
 
     def _update_bridge_status(self):
         """Update bridge connection status display."""

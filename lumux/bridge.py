@@ -2,7 +2,9 @@
 
 import socket
 import time
-from typing import Dict, List, Optional
+import urllib.request
+import json
+from typing import Dict, List, Optional, Tuple
 from datetime import datetime
 
 
@@ -38,37 +40,80 @@ class HueBridge:
             print(f"Error connecting to bridge: {e}")
             return False
 
-    def create_user(self, bridge_ip: str, application_name: str = "lumux") -> Optional[dict]:
+    def create_user(self, bridge_ip: str, application_name: str = "lumux",
+                   max_retries: int = 3, timeout: float = 10.0) -> Optional[dict]:
         """Create a new user/app key on the bridge.
 
         User must press the link button on the bridge before calling this.
-        Returns dict with 'app_key' and 'client_key' on success, None on failure.
+        Retries with exponential backoff if the link button hasn't been pressed yet.
+
+        Args:
+            bridge_ip: IP address of the Hue bridge
+            application_name: Name of the application to register
+            max_retries: Maximum number of attempts
+            timeout: Request timeout in seconds
+
+        Returns:
+            Dict with 'app_key' and 'client_key' on success, None on failure.
         """
-        try:
-            import requests
-            import json
-            
-            # Use Hue Bridge API v2 to create application key
-            url = f"https://{bridge_ip}/api"
-            payload = {"devicetype": f"{application_name}#user", "generateclientkey": True}
-            
-            # Disable SSL verification for self-signed certificate
-            response = requests.post(url, json=payload, verify=False, timeout=5)
-            
-            if response.status_code == 200:
-                result = response.json()
-                if result and len(result) > 0:
-                    if 'success' in result[0]:
-                        app_key = result[0]['success']['username']
-                        client_key = result[0]['success'].get('clientkey', '')
-                        self.app_key = app_key
-                        self.bridge_ip = bridge_ip
-                        return {'app_key': app_key, 'client_key': client_key}
-                    elif 'error' in result[0]:
-                        error_msg = result[0]['error'].get('description', 'Unknown error')
-                        print(f"Bridge error: {error_msg}")
-        except Exception as e:
-            print(f"Error creating user: {e}")
+        import requests
+        import urllib3
+        urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+        url = f"https://{bridge_ip}/api"
+        payload = {"devicetype": f"{application_name}#user", "generateclientkey": True}
+
+        for attempt in range(1, max_retries + 1):
+            try:
+                print(f"Authentication attempt {attempt}/{max_retries}...")
+
+                # Disable SSL verification for self-signed certificate
+                response = requests.post(
+                    url,
+                    json=payload,
+                    verify=False,
+                    timeout=timeout
+                )
+
+                if response.status_code == 200:
+                    result = response.json()
+                    if result and len(result) > 0:
+                        if 'success' in result[0]:
+                            app_key = result[0]['success']['username']
+                            client_key = result[0]['success'].get('clientkey', '')
+                            self.app_key = app_key
+                            self.bridge_ip = bridge_ip
+                            print(f"Successfully authenticated with bridge at {bridge_ip}")
+                            return {'app_key': app_key, 'client_key': client_key}
+                        elif 'error' in result[0]:
+                            error_type = result[0]['error'].get('type', 0)
+                            error_msg = result[0]['error'].get('description', 'Unknown error')
+
+                            # Error 101 = link button not pressed
+                            if error_type == 101:
+                                if attempt < max_retries:
+                                    wait_time = min(2 ** attempt, 8)  # Exponential backoff
+                                    print(f"Link button not pressed. Retrying in {wait_time}s...")
+                                    time.sleep(wait_time)
+                                    continue
+                                else:
+                                    print(f"Link button was not pressed within the timeout period")
+                            else:
+                                print(f"Bridge error: {error_msg}")
+                                return None
+
+            except requests.exceptions.Timeout:
+                print(f"Request timeout (attempt {attempt}/{max_retries})")
+                if attempt < max_retries:
+                    time.sleep(2 ** attempt)
+            except requests.exceptions.ConnectionError as e:
+                print(f"Connection error: {e}")
+                if attempt < max_retries:
+                    time.sleep(2 ** attempt)
+            except Exception as e:
+                print(f"Error creating user: {e}")
+                return None
+
         return None
 
     def refresh_devices(self):
@@ -291,8 +336,73 @@ class HueBridge:
         return {light_id: info['name'] for light_id, info in self.light_info.items()}
 
     @classmethod
-    def discover_bridges(cls) -> List[str]:
-        """Discover Hue bridges on local network using SSDP.
+    def discover_bridges(cls, max_retries: int = 3, timeout: float = 5.0) -> List[str]:
+        """Discover Hue bridges using multiple methods.
+
+        Tries in order:
+        1. SSDP (local network broadcast)
+        2. mDNS/Zeroconf fallback (_hue._tcp)
+        3. N-UPnP cloud discovery (https://discovery.meethue.com/)
+
+        Args:
+            max_retries: Maximum number of discovery attempts with exponential backoff
+            timeout: Timeout per discovery attempt in seconds
+
+        Returns:
+            List of bridge IP addresses (unique, sorted)
+        """
+        bridges = []
+        attempt = 0
+
+        while attempt < max_retries and not bridges:
+            attempt += 1
+            print(f"Discovery attempt {attempt}/{max_retries}...")
+
+            # Method 1: SSDP discovery
+            try:
+                bridges.extend(cls._discover_ssdp(timeout=timeout))
+            except Exception as e:
+                print(f"SSDP discovery error: {e}")
+
+            # Method 2: mDNS discovery (if zeroconf is available)
+            try:
+                bridges.extend(cls._discover_mdns(timeout=timeout))
+            except Exception as e:
+                print(f"mDNS discovery error: {e}")
+
+            # Method 3: N-UPnP cloud discovery
+            try:
+                bridges.extend(cls._discover_nupnp())
+            except Exception as e:
+                print(f"N-UPnP discovery error: {e}")
+
+            # If no bridges found, wait with exponential backoff before retry
+            if not bridges and attempt < max_retries:
+                wait_time = min(2 ** attempt, 8)  # Max 8 second wait
+                print(f"No bridges found. Retrying in {wait_time}s...")
+                time.sleep(wait_time)
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_bridges = []
+        for ip in bridges:
+            if ip not in seen:
+                seen.add(ip)
+                unique_bridges.append(ip)
+
+        if unique_bridges:
+            print(f"Found {len(unique_bridges)} bridge(s): {unique_bridges}")
+        else:
+            print("No bridges found after all attempts")
+
+        return unique_bridges
+
+    @classmethod
+    def _discover_ssdp(cls, timeout: float = 5.0) -> List[str]:
+        """Discover bridges using SSDP protocol.
+
+        Args:
+            timeout: Socket timeout in seconds
 
         Returns:
             List of bridge IP addresses
@@ -301,8 +411,8 @@ class HueBridge:
 
         try:
             sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-            sock.settimeout(2)
-            
+            sock.settimeout(timeout)
+
             ssdp_request = (
                 b"M-SEARCH * HTTP/1.1\r\n"
                 b"HOST: 239.255.255.250:1900\r\n"
@@ -311,24 +421,116 @@ class HueBridge:
                 b"ST: ssdp:all\r\n"
                 b"\r\n"
             )
-            
+
             sock.sendto(ssdp_request, ("239.255.255.250", 1900))
-            
-            while True:
+
+            # Collect responses until timeout
+            start_time = time.time()
+            while time.time() - start_time < timeout:
                 try:
                     data, addr = sock.recvfrom(1024)
                     response = data.decode('utf-8', errors='ignore')
-                    
-                    if "hue-bridgeid" in response.lower():
+
+                    if "hue-bridgeid" in response.lower() or "phillips-hue" in response.lower():
                         ip_address = addr[0]
                         if ip_address not in bridges:
                             bridges.append(ip_address)
+                            print(f"SSDP found bridge at {ip_address}")
                 except socket.timeout:
                     break
-            
+
             sock.close()
         except Exception as e:
-            print(f"Error discovering bridges: {e}")
+            print(f"SSDP discovery error: {e}")
+
+        return bridges
+
+    @classmethod
+    def _discover_mdns(cls, timeout: float = 5.0) -> List[str]:
+        """Discover bridges using mDNS/Zeroconf (_hue._tcp).
+
+        Args:
+            timeout: Discovery timeout in seconds
+
+        Returns:
+            List of bridge IP addresses
+        """
+        bridges = []
+
+        try:
+            from zeroconf import Zeroconf, ServiceBrowser, ServiceListener
+
+            class HueListener(ServiceListener):
+                def __init__(self):
+                    self.bridges = []
+
+                def add_service(self, zc, type_, name):
+                    info = zc.get_service_info(type_, name)
+                    if info and info.parsed_addresses():
+                        for addr in info.parsed_addresses():
+                            if addr not in self.bridges:
+                                self.bridges.append(addr)
+                                print(f"mDNS found bridge at {addr}")
+
+                def remove_service(self, zc, type_, name):
+                    pass
+
+                def update_service(self, zc, type_, name):
+                    pass
+
+            zeroconf = Zeroconf()
+            listener = HueListener()
+            browser = ServiceBrowser(zeroconf, "_hue._tcp.local.", listener)
+
+            # Wait for discovery
+            time.sleep(timeout)
+
+            browser.cancel()
+            zeroconf.close()
+
+            bridges.extend(listener.bridges)
+
+        except ImportError:
+            print("zeroconf not available for mDNS discovery (pip install zeroconf)")
+        except Exception as e:
+            print(f"mDNS discovery error: {e}")
+
+        return bridges
+
+    @classmethod
+    def _discover_nupnp(cls) -> List[str]:
+        """Discover bridges using N-UPnP cloud discovery.
+
+        Queries https://discovery.meethue.com/ for bridges associated
+        with the public IP address.
+
+        Returns:
+            List of bridge IP addresses
+        """
+        bridges = []
+
+        try:
+            url = "https://discovery.meethue.com/"
+            req = urllib.request.Request(
+                url,
+                headers={"User-Agent": "Lumux/1.0"}
+            )
+
+            with urllib.request.urlopen(req, timeout=5) as response:
+                data = json.loads(response.read().decode('utf-8'))
+
+                for bridge in data:
+                    internal_ip = bridge.get('internalipaddress')
+                    if internal_ip and internal_ip not in bridges:
+                        bridges.append(internal_ip)
+                        print(f"N-UPnP found bridge at {internal_ip}")
+
+        except urllib.error.URLError as e:
+            print(f"N-UPnP discovery failed (no internet?): {e}")
+        except json.JSONDecodeError as e:
+            print(f"N-UPnP discovery failed (invalid response): {e}")
+        except Exception as e:
+            print(f"N-UPnP discovery error: {e}")
 
         return bridges
 

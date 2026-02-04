@@ -173,8 +173,10 @@ class ScreenCapture:
             req = screencast.CreateSession({"session_handle_token": GLib.Variant("s", "s"+token)})
             sub = bus.con.signal_subscribe(None, "org.freedesktop.portal.Request", "Response", req, None, 0, on_response)
             GLib.timeout_add_seconds(30, loop.quit)
-            loop.run()
-            bus.con.signal_unsubscribe(sub)
+            try:
+                loop.run()
+            finally:
+                bus.con.signal_unsubscribe(sub)
             
             if not state["session_handle"]:
                 return False
@@ -187,15 +189,19 @@ class ScreenCapture:
                 "multiple": GLib.Variant("b", False)
             })
             sub = bus.con.signal_subscribe(None, "org.freedesktop.portal.Request", "Response", req, None, 0, on_response)
-            loop.run()
-            bus.con.signal_unsubscribe(sub)
+            try:
+                loop.run()
+            finally:
+                bus.con.signal_unsubscribe(sub)
             
             # 3. Start
             loop = GLib.MainLoop()
             req = screencast.Start(self._portal_session_handle, "", {})
             sub = bus.con.signal_subscribe(None, "org.freedesktop.portal.Request", "Response", req, None, 0, on_response)
-            loop.run()
-            bus.con.signal_unsubscribe(sub)
+            try:
+                loop.run()
+            finally:
+                bus.con.signal_unsubscribe(sub)
             
             if state["node_id"]:
                 self._portal_node_id = state["node_id"]

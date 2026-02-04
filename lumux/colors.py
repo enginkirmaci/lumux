@@ -71,6 +71,10 @@ class ColorAnalyzer:
         """
         smoothed = {}
         
+        # Return early if current is empty to avoid overwriting previous_colors
+        if not current:
+            return smoothed
+        
         for zone_id, curr_value in current.items():
             if zone_id in self.previous_colors:
                 curr_xy, curr_bri = curr_value

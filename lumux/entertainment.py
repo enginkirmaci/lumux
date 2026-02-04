@@ -193,6 +193,19 @@ class EntertainmentStream:
                 print(f"stderr: {stderr.decode()}")
                 return False
             
+            # Verify handshake succeeded by checking if process is ready for input
+            # A successful handshake means the process stays alive and accepts data
+            import select
+            # Give it a bit more time for handshake to complete
+            time.sleep(0.3)
+            
+            # Check again if process is still running after handshake period
+            if self._openssl_proc.poll() is not None:
+                stdout, stderr = self._openssl_proc.communicate()
+                print(f"DTLS handshake failed (exit code {self._openssl_proc.returncode})")
+                print(f"stderr: {stderr.decode()}")
+                return False
+            
             _timed_print(f"DTLS connection established to {self.bridge_ip}:{ENTERTAINMENT_PORT}")
             return True
 
@@ -286,10 +299,21 @@ class EntertainmentStream:
     def _send_dtls_message(self, message: bytes):
         """Send a message over the DTLS connection."""
         if self._openssl_proc:
-            self._openssl_proc.stdin.write(message)
-            self._openssl_proc.stdin.flush()
+            try:
+                self._openssl_proc.stdin.write(message)
+                self._openssl_proc.stdin.flush()
+            except (BrokenPipeError, OSError) as e:
+                # Connection lost, mark as disconnected
+                print(f"DTLS connection lost: {e}")
+                self._connected = False
+                raise
         elif self._dtls_socket:
-            self._dtls_socket.send(message)
+            try:
+                self._dtls_socket.send(message)
+            except OSError as e:
+                print(f"DTLS socket error: {e}")
+                self._connected = False
+                raise
         else:
             raise Exception("No DTLS connection available")
 

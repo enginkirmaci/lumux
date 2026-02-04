@@ -8,32 +8,64 @@ import struct
 import subprocess
 import threading
 import time
-from datetime import datetime
+from dataclasses import dataclass
+from enum import IntEnum
 from typing import Dict, Optional, Tuple, TYPE_CHECKING
+
+from lumux.utils.logging import timed_print
 
 if TYPE_CHECKING:
     from lumux.bridge import HueBridge
 
 
-def _timed_print(*args, **kwargs):
-    prefix = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
-    print(prefix, *args, **kwargs)
-
-
 # HueStream protocol constants
-HUESTREAM_HEADER = b"HueStream"
-HUESTREAM_VERSION_MAJOR = 0x02  # API version 2.0
-HUESTREAM_VERSION_MINOR = 0x00
-HUESTREAM_COLORSPACE_RGB = 0x00
-HUESTREAM_COLORSPACE_XY = 0x01
-ENTERTAINMENT_PORT = 2100
+class HueStreamProtocol:
+    """HueStream protocol constants."""
+    HEADER = b"HueStream"
+    VERSION_MAJOR = 0x02  # API version 2.0
+    VERSION_MINOR = 0x00
+    PORT = 2100
+    
+    # Color space constants
+    COLORSPACE_RGB = 0x00
+    COLORSPACE_XY = 0x01
+    
+    # Message structure sizes (bytes)
+    HEADER_SIZE = 9
+    VERSION_SIZE = 2
+    SEQUENCE_SIZE = 1
+    RESERVED_SIZE = 2
+    COLORSPACE_SIZE = 1
+    RESERVED2_SIZE = 1
+    CONFIG_ID_SIZE = 36  # ASCII UUID string
+    CHANNEL_DATA_SIZE = 7  # 1 byte ID + 3×2 bytes color data
+    
+    # Color value scaling
+    MAX_16BIT = 65535
+    BRIGHTNESS_SCALE = 257  # 254 * 257 ≈ 65278
+
+
+class ChannelInfo:
+    """Information about an entertainment channel."""
+    
+    def __init__(self, channel_id: int, position: Dict, members: list):
+        self.channel_id = channel_id
+        self.position = position
+        self.members = members
 
 
 class EntertainmentStream:
     """Manages DTLS connection and streaming to a Hue Entertainment zone."""
 
-    def __init__(self, bridge_ip: str, app_key: str, client_key: str,
-                 entertainment_config_id: str):
+    def __init__(
+        self,
+        bridge_ip: str,
+        app_key: str,
+        client_key: str,
+        entertainment_config_id: str,
+        connection_timeout: float = 0.5,
+        handshake_delay: float = 0.3
+    ):
         """Initialize entertainment stream.
 
         Args:
@@ -41,23 +73,36 @@ class EntertainmentStream:
             app_key: Application key (username) - used to get hue-application-id
             client_key: Client key - used as PSK (32-byte hex string)
             entertainment_config_id: ID of the entertainment configuration to stream to
+            connection_timeout: Time to wait for DTLS connection (seconds)
+            handshake_delay: Additional time for handshake completion (seconds)
         """
         self.bridge_ip = bridge_ip
         self.app_key = app_key
         self.client_key = client_key
         self.entertainment_config_id = entertainment_config_id
-        self._application_id = None  # Retrieved from /auth/v1
-
-        self._dtls_socket = None
-        self._openssl_proc = None  # OpenSSL subprocess for DTLS
+        self._connection_timeout = connection_timeout
+        self._handshake_delay = handshake_delay
+        
+        self._application_id: Optional[str] = None
+        self._openssl_proc: Optional[subprocess.Popen] = None
+        self._dtls_socket = None  # Future: native DTLS implementation
         self._connected = False
         self._sequence = 0
         self._lock = threading.Lock()
 
-        # Channel mapping: channel_id -> position info
-        self.channels: Dict[int, dict] = {}
-        # Reverse mapping: light_id -> channel_id (for convenience)
-        self.light_to_channel: Dict[str, int] = {}
+        # Channel mappings
+        self._channels: Dict[int, ChannelInfo] = {}
+        self._light_to_channel: Dict[str, int] = {}
+
+    @property
+    def channels(self) -> Dict[int, ChannelInfo]:
+        """Channel mapping: channel_id -> ChannelInfo."""
+        return self._channels
+
+    @property
+    def light_to_channel(self) -> Dict[str, int]:
+        """Reverse mapping: light_id -> channel_id."""
+        return self._light_to_channel
 
     def connect(self, bridge: 'HueBridge') -> bool:
         """Establish DTLS connection to the bridge.
@@ -69,112 +114,123 @@ class EntertainmentStream:
             True if connection successful, False otherwise
         """
         try:
-            # First, get entertainment configuration details
-            config = bridge.get_entertainment_configuration(self.entertainment_config_id)
+            config = self._fetch_entertainment_config(bridge)
             if not config:
-                print(f"Entertainment configuration {self.entertainment_config_id} not found")
                 return False
 
-            # Parse channels from the configuration
             self._parse_channels(config)
+            self._application_id = self._fetch_application_id(bridge)
 
-            # Get hue-application-id for PSK identity
-            self._application_id = self._get_application_id(bridge)
-            if not self._application_id:
-                _timed_print("Warning: Could not get hue-application-id, falling back to app_key")
-                self._application_id = self.app_key
-            else:
-                _timed_print(f"Got hue-application-id: {self._application_id}")
-
-            # Activate streaming via REST API
-            if not bridge.activate_entertainment_streaming(self.entertainment_config_id):
-                print("Failed to activate entertainment streaming")
+            if not self._activate_streaming(bridge):
                 return False
 
-            # Give the bridge a moment to prepare for DTLS connections
-            import time
-            time.sleep(0.5)
-
-            # Establish DTLS connection
-            if not self._connect_dtls():
-                bridge.deactivate_entertainment_streaming(self.entertainment_config_id)
+            if not self._establish_dtls_connection():
+                self._deactivate_streaming(bridge)
                 return False
 
             self._connected = True
-            _timed_print(f"Entertainment stream connected with {len(self.channels)} channels")
+            timed_print(f"Entertainment stream connected with {len(self._channels)} channels")
             return True
 
         except Exception as e:
             print(f"Error connecting entertainment stream: {e}")
             return False
 
-    def _get_application_id(self, bridge: 'HueBridge') -> Optional[str]:
+    def _fetch_entertainment_config(self, bridge: 'HueBridge') -> Optional[dict]:
+        """Fetch entertainment configuration from bridge."""
+        config = bridge.get_entertainment_configuration(self.entertainment_config_id)
+        if not config:
+            print(f"Entertainment configuration {self.entertainment_config_id} not found")
+        return config
+
+    def _fetch_application_id(self, bridge: 'HueBridge') -> str:
         """Get hue-application-id from /auth/v1 endpoint.
         
         This is the correct PSK identity for DTLS connection per official API docs.
+        Falls back to app_key if unavailable.
         """
         try:
-            return bridge.get_application_id()
+            app_id = bridge.get_application_id()
+            if app_id:
+                timed_print(f"Got hue-application-id: {app_id}")
+                return app_id
         except Exception as e:
-            _timed_print(f"Error getting application ID: {e}")
-            return None
+            timed_print(f"Error getting application ID: {e}")
+        
+        timed_print("Warning: Could not get hue-application-id, falling back to app_key")
+        return self.app_key
 
-    def _parse_channels(self, config: dict):
+    def _activate_streaming(self, bridge: 'HueBridge') -> bool:
+        """Activate streaming via REST API."""
+        if not bridge.activate_entertainment_streaming(self.entertainment_config_id):
+            print("Failed to activate entertainment streaming")
+            return False
+        time.sleep(self._connection_timeout)  # Give bridge time to prepare
+        return True
+
+    def _deactivate_streaming(self, bridge: 'HueBridge') -> None:
+        """Deactivate streaming via REST API."""
+        try:
+            bridge.deactivate_entertainment_streaming(self.entertainment_config_id)
+        except Exception as e:
+            print(f"Error deactivating streaming: {e}")
+
+    def _parse_channels(self, config: dict) -> None:
         """Parse channel information from entertainment configuration."""
-        self.channels.clear()
-        self.light_to_channel.clear()
+        self._channels.clear()
+        self._light_to_channel.clear()
 
         channels = config.get('channels', [])
-        _timed_print(f"Entertainment config has {len(channels)} channel entries")
+        timed_print(f"Entertainment config has {len(channels)} channel entries")
         
         for channel in channels:
-            channel_id = channel.get('channel_id')
-            if channel_id is None:
-                _timed_print(f"  Skipping channel without ID: {channel}")
-                continue
+            self._parse_single_channel(channel)
 
-            position = channel.get('position', {})
-            members = channel.get('members', [])
+        timed_print(f"Parsed {len(self._channels)} channels from entertainment config")
 
-            self.channels[channel_id] = {
-                'channel_id': channel_id,
-                'position': position,
-                'members': members
-            }
-            
-            _timed_print(f"  Channel {channel_id}: pos=({position.get('x', 0):.2f}, {position.get('y', 0):.2f}, {position.get('z', 0):.2f}), {len(members)} members")
+    def _parse_single_channel(self, channel: dict) -> None:
+        """Parse a single channel from config."""
+        channel_id = channel.get('channel_id')
+        if channel_id is None:
+            timed_print(f"  Skipping channel without ID: {channel}")
+            return
 
-            # Map member light IDs to channel
-            for member in members:
-                service = member.get('service', {})
-                light_rid = service.get('rid')
-                if light_rid:
-                    self.light_to_channel[light_rid] = channel_id
+        position = channel.get('position', {})
+        members = channel.get('members', [])
 
-        _timed_print(f"Parsed {len(self.channels)} channels from entertainment config")
-
-    def _connect_dtls(self) -> bool:
-        """Establish DTLS-PSK connection to bridge port 2100.
+        self._channels[channel_id] = ChannelInfo(
+            channel_id=channel_id,
+            position=position,
+            members=members
+        )
         
-        Uses openssl s_client subprocess for DTLS-PSK connection.
-        """
-        import subprocess
-        
+        pos_x = position.get('x', 0)
+        pos_y = position.get('y', 0)
+        pos_z = position.get('z', 0)
+        timed_print(
+            f"  Channel {channel_id}: "
+            f"pos=({pos_x:.2f}, {pos_y:.2f}, {pos_z:.2f}), "
+            f"{len(members)} members"
+        )
+
+        for member in members:
+            self._map_member_to_channel(member, channel_id)
+
+    def _map_member_to_channel(self, member: dict, channel_id: int) -> None:
+        """Map a member light to its channel."""
+        service = member.get('service', {})
+        light_rid = service.get('rid')
+        if light_rid:
+            self._light_to_channel[light_rid] = channel_id
+
+    def _establish_dtls_connection(self) -> bool:
+        """Establish DTLS-PSK connection to bridge port 2100."""
         try:
-            # Start openssl s_client for DTLS-PSK
-            # PSK identity must be hue-application-id (from /auth/v1), not app_key
-            psk_identity = self._application_id or self.app_key
-            cmd = [
-                "openssl", "s_client",
-                "-dtls1_2",
-                "-psk_identity", psk_identity,
-                "-psk", self.client_key,
-                "-cipher", "PSK-AES128-GCM-SHA256:PSK-CHACHA20-POLY1305",
-                "-connect", f"{self.bridge_ip}:{ENTERTAINMENT_PORT}",
-                "-quiet",
-            ]
-            
-            _timed_print(f"Starting DTLS connection: openssl s_client -dtls1_2 -connect {self.bridge_ip}:{ENTERTAINMENT_PORT}")
+            cmd = self._build_openssl_command()
+            timed_print(
+                f"Starting DTLS connection: "
+                f"openssl s_client -dtls1_2 -connect {self.bridge_ip}:{HueStreamProtocol.PORT}"
+            )
             
             self._openssl_proc = subprocess.Popen(
                 cmd,
@@ -183,31 +239,7 @@ class EntertainmentStream:
                 stderr=subprocess.PIPE,
             )
             
-            # Wait for connection to establish
-            time.sleep(0.5)
-            
-            # Check if process is still running
-            if self._openssl_proc.poll() is not None:
-                stdout, stderr = self._openssl_proc.communicate()
-                print(f"DTLS connection failed (exit code {self._openssl_proc.returncode})")
-                print(f"stderr: {stderr.decode()}")
-                return False
-            
-            # Verify handshake succeeded by checking if process is ready for input
-            # A successful handshake means the process stays alive and accepts data
-            import select
-            # Give it a bit more time for handshake to complete
-            time.sleep(0.3)
-            
-            # Check again if process is still running after handshake period
-            if self._openssl_proc.poll() is not None:
-                stdout, stderr = self._openssl_proc.communicate()
-                print(f"DTLS handshake failed (exit code {self._openssl_proc.returncode})")
-                print(f"stderr: {stderr.decode()}")
-                return False
-            
-            _timed_print(f"DTLS connection established to {self.bridge_ip}:{ENTERTAINMENT_PORT}")
-            return True
+            return self._wait_for_handshake()
 
         except FileNotFoundError:
             print("DTLS connection failed: openssl command not found")
@@ -218,66 +250,95 @@ class EntertainmentStream:
             traceback.print_exc()
             return False
 
-    def disconnect(self, bridge: 'HueBridge'):
+    def _build_openssl_command(self) -> list[str]:
+        """Build OpenSSL command for DTLS-PSK connection."""
+        psk_identity = self._application_id or self.app_key
+        return [
+            "openssl", "s_client",
+            "-dtls1_2",
+            "-psk_identity", psk_identity,
+            "-psk", self.client_key,
+            "-cipher", "PSK-AES128-GCM-SHA256:PSK-CHACHA20-POLY1305",
+            "-connect", f"{self.bridge_ip}:{HueStreamProtocol.PORT}",
+            "-quiet",
+        ]
+
+    def _wait_for_handshake(self) -> bool:
+        """Wait for DTLS handshake to complete."""
+        time.sleep(self._connection_timeout)
+        
+        if self._openssl_proc.poll() is not None:
+            return self._report_handshake_failure("initial connection")
+        
+        time.sleep(self._handshake_delay)
+        
+        if self._openssl_proc.poll() is not None:
+            return self._report_handshake_failure("handshake")
+        
+        timed_print(f"DTLS connection established to {self.bridge_ip}:{HueStreamProtocol.PORT}")
+        return True
+
+    def _report_handshake_failure(self, stage: str) -> bool:
+        """Report handshake failure and cleanup."""
+        if self._openssl_proc:
+            stdout, stderr = self._openssl_proc.communicate()
+            print(f"DTLS {stage} failed (exit code {self._openssl_proc.returncode})")
+            print(f"stderr: {stderr.decode()}")
+        return False
+
+    def disconnect(self, bridge: 'HueBridge') -> None:
         """Close DTLS connection and deactivate streaming."""
         self._connected = False
+        self._cleanup_openssl()
+        self._deactivate_streaming(bridge)
+        timed_print("Entertainment stream disconnected")
 
-        # Clean up subprocess-based DTLS connection
-        if self._openssl_proc:
+    def _cleanup_openssl(self) -> None:
+        """Clean up OpenSSL subprocess."""
+        if not self._openssl_proc:
+            return
+            
+        try:
+            self._openssl_proc.stdin.close()
+            self._openssl_proc.terminate()
+            self._openssl_proc.wait(timeout=2)
+        except Exception:
             try:
-                self._openssl_proc.stdin.close()
-                self._openssl_proc.terminate()
-                self._openssl_proc.wait(timeout=2)
-            except Exception:
-                try:
-                    self._openssl_proc.kill()
-                except:
-                    pass
-            self._openssl_proc = None
-
-        if self._dtls_socket:
-            try:
-                self._dtls_socket.shutdown()
-                self._dtls_socket.close()
+                self._openssl_proc.kill()
             except Exception:
                 pass
-            self._dtls_socket = None
-
-        # Deactivate streaming via REST API
-        try:
-            bridge.deactivate_entertainment_streaming(self.entertainment_config_id)
-        except Exception as e:
-            print(f"Error deactivating streaming: {e}")
-
-        _timed_print("Entertainment stream disconnected")
+        finally:
+            self._openssl_proc = None
 
     def is_connected(self) -> bool:
         """Check if DTLS connection is active."""
         if self._openssl_proc:
             return self._connected and self._openssl_proc.poll() is None
-        return self._connected and self._dtls_socket is not None
+        return self._connected
 
-    def send_colors(self, colors: Dict[int, Tuple[float, float, float, float]]):
-        """Send color update to all channels.
+    def send_colors(self, colors: Dict[int, Tuple[float, float, float, float]]) -> None:
+        """Send color update to all channels (RGB format).
 
         Args:
-            colors: Dict mapping channel_id to (x, y, brightness, _) tuple
-                   where x, y are CIE color coordinates (0.0-1.0)
-                   and brightness is 0.0-1.0
+            colors: Dict mapping channel_id to (r, g, b, _) tuple
+                   where r, g, b are 0.0-1.0
         """
         if not self.is_connected():
             return
 
         with self._lock:
             try:
-                message = self._build_message(colors)
+                message = self._build_rgb_message(colors)
                 self._send_dtls_message(message)
                 self._sequence = (self._sequence + 1) % 256
             except Exception as e:
                 print(f"Error sending colors: {e}")
                 self._connected = False
 
-    def send_colors_xy(self, channel_colors: Dict[int, Tuple[Tuple[float, float], int]]):
+    def send_colors_xy(
+        self,
+        channel_colors: Dict[int, Tuple[Tuple[float, float], int]]
+    ) -> None:
         """Send color update using XY + brightness format.
 
         Args:
@@ -289,138 +350,130 @@ class EntertainmentStream:
 
         with self._lock:
             try:
-                message = self._build_message_xy(channel_colors)
+                message = self._build_xy_message(channel_colors)
                 self._send_dtls_message(message)
                 self._sequence = (self._sequence + 1) % 256
             except Exception as e:
                 print(f"Error sending colors: {e}")
                 self._connected = False
 
-    def _send_dtls_message(self, message: bytes):
+    def _send_dtls_message(self, message: bytes) -> None:
         """Send a message over the DTLS connection."""
         if self._openssl_proc:
-            try:
-                self._openssl_proc.stdin.write(message)
-                self._openssl_proc.stdin.flush()
-            except (BrokenPipeError, OSError) as e:
-                # Connection lost, mark as disconnected
-                print(f"DTLS connection lost: {e}")
-                self._connected = False
-                raise
+            self._send_via_openssl(message)
         elif self._dtls_socket:
-            try:
-                self._dtls_socket.send(message)
-            except OSError as e:
-                print(f"DTLS socket error: {e}")
-                self._connected = False
-                raise
+            self._send_via_socket(message)
         else:
-            raise Exception("No DTLS connection available")
+            raise ConnectionError("No DTLS connection available")
 
-    def _build_message(self, colors: Dict[int, Tuple[float, float, float, float]]) -> bytes:
-        """Build HueStream v2 message with RGB color space.
+    def _send_via_openssl(self, message: bytes) -> None:
+        """Send message via OpenSSL subprocess."""
+        try:
+            self._openssl_proc.stdin.write(message)
+            self._openssl_proc.stdin.flush()
+        except (BrokenPipeError, OSError) as e:
+            print(f"DTLS connection lost: {e}")
+            self._connected = False
+            raise
 
-        Official HueStream API format (per Hue Entertainment API docs):
-        - Header: "HueStream" (9 bytes)
-        - Version: 0x02 0x00 (2 bytes) - API v2.0
-        - Sequence: 1 byte - increments with each message
-        - Reserved: 0x00 0x00 (2 bytes)
-        - Color space: 0x00=RGB, 0x01=XY+Bri (1 byte)
-        - Reserved: 0x00 (1 byte)
-        - Entertainment config ID: 36 bytes ASCII UUID string
-        
-        Per-channel (7 bytes each):
-        - Channel ID: 1 byte
-        - R: 2 bytes (16-bit big-endian)
-        - G: 2 bytes (16-bit big-endian)
-        - B: 2 bytes (16-bit big-endian)
-        """
-        # Build header
-        header = bytearray()
-        header.extend(HUESTREAM_HEADER)  # "HueStream"
-        header.append(HUESTREAM_VERSION_MAJOR)  # Version 0x02
-        header.append(HUESTREAM_VERSION_MINOR)  # Version 0x00
-        header.append(self._sequence)  # Sequence
-        header.extend([0x00, 0x00])  # Reserved
-        header.append(HUESTREAM_COLORSPACE_RGB)  # Color space: RGB
-        header.append(0x00)  # Reserved
-        
-        # Entertainment config ID (36 bytes ASCII string, NOT binary UUID)
-        header.extend(self.entertainment_config_id.encode('ascii'))
+    def _send_via_socket(self, message: bytes) -> None:
+        """Send message via native DTLS socket."""
+        try:
+            self._dtls_socket.send(message)
+        except OSError as e:
+            print(f"DTLS socket error: {e}")
+            self._connected = False
+            raise
 
-        # Build channel data
-        data = bytearray()
-        for channel_id in sorted(self.channels.keys()):
-            if channel_id in colors:
-                r, g, b, _ = colors[channel_id]
-            else:
-                r, g, b = 0.0, 0.0, 0.0
-
-            # Convert 0-1 float to 16-bit integer (0x0000 - 0xFFFF)
-            r16 = int(max(0, min(1, r)) * 65535)
-            g16 = int(max(0, min(1, g)) * 65535)
-            b16 = int(max(0, min(1, b)) * 65535)
-
-            # Channel ID (1 byte) + RGB (2 bytes each, big-endian)
-            data.append(channel_id)
-            data.extend([(r16 >> 8) & 0xFF, r16 & 0xFF])
-            data.extend([(g16 >> 8) & 0xFF, g16 & 0xFF])
-            data.extend([(b16 >> 8) & 0xFF, b16 & 0xFF])
-
+    def _build_rgb_message(
+        self,
+        colors: Dict[int, Tuple[float, float, float, float]]
+    ) -> bytes:
+        """Build HueStream v2 message with RGB color space."""
+        header = self._build_message_header(HueStreamProtocol.COLORSPACE_RGB)
+        data = self._build_rgb_channel_data(colors)
         return bytes(header + data)
 
-    def _build_message_xy(self, colors: Dict[int, Tuple[Tuple[float, float], int]]) -> bytes:
-        """Build HueStream v2 message with XY+Brightness color space.
-
-        Official HueStream API format:
-        - Header: "HueStream" (9 bytes)
-        - Version: 0x02 0x00 (2 bytes) - API v2.0
-        - Sequence: 1 byte
-        - Reserved: 0x00 0x00 (2 bytes)
-        - Color space: 0x01 (XY+Bri) (1 byte)
-        - Reserved: 0x00 (1 byte)
-        - Entertainment config ID: 36 bytes ASCII UUID string
-        
-        Per-channel (7 bytes each):
-        - Channel ID: 1 byte
-        - X: 2 bytes (16-bit big-endian, 0x0000=0.0, 0xFFFF=1.0)
-        - Y: 2 bytes (16-bit big-endian, 0x0000=0.0, 0xFFFF=1.0)
-        - Brightness: 2 bytes (16-bit big-endian)
-        """
-        # Build header
-        header = bytearray()
-        header.extend(HUESTREAM_HEADER)  # "HueStream"
-        header.append(HUESTREAM_VERSION_MAJOR)  # Version 0x02
-        header.append(HUESTREAM_VERSION_MINOR)  # Version 0x00
-        header.append(self._sequence)  # Sequence
-        header.extend([0x00, 0x00])  # Reserved
-        header.append(HUESTREAM_COLORSPACE_XY)  # Color space: XY+Bri
-        header.append(0x00)  # Reserved
-        
-        # Entertainment config ID (36 bytes ASCII string)
-        header.extend(self.entertainment_config_id.encode('ascii'))
-
-        # Build channel data
-        data = bytearray()
-        for channel_id in sorted(self.channels.keys()):
-            if channel_id in colors:
-                (x, y), brightness = colors[channel_id]
-            else:
-                x, y, brightness = 0.0, 0.0, 0
-
-            # X and Y are 0-1, scale to 16-bit (0x0000 to 0xFFFF)
-            x16 = int(max(0, min(1, x)) * 65535)
-            y16 = int(max(0, min(1, y)) * 65535)
-            # Brightness 0-254 scaled to 16-bit
-            bri16 = int(max(0, min(254, brightness)) * 257)  # 254 * 257 ≈ 65278
-
-            # Channel ID (1 byte) + XY+Bri (2 bytes each, big-endian)
-            data.append(channel_id)
-            data.extend([(x16 >> 8) & 0xFF, x16 & 0xFF])
-            data.extend([(y16 >> 8) & 0xFF, y16 & 0xFF])
-            data.extend([(bri16 >> 8) & 0xFF, bri16 & 0xFF])
-
+    def _build_xy_message(
+        self,
+        colors: Dict[int, Tuple[Tuple[float, float], int]]
+    ) -> bytes:
+        """Build HueStream v2 message with XY+Brightness color space."""
+        header = self._build_message_header(HueStreamProtocol.COLORSPACE_XY)
+        data = self._build_xy_channel_data(colors)
         return bytes(header + data)
+
+    def _build_message_header(self, colorspace: int) -> bytearray:
+        """Build HueStream message header."""
+        header = bytearray()
+        header.extend(HueStreamProtocol.HEADER)
+        header.append(HueStreamProtocol.VERSION_MAJOR)
+        header.append(HueStreamProtocol.VERSION_MINOR)
+        header.append(self._sequence)
+        header.extend([0x00, 0x00])  # Reserved
+        header.append(colorspace)
+        header.append(0x00)  # Reserved
+        header.extend(self.entertainment_config_id.encode('ascii'))
+        return header
+
+    def _build_rgb_channel_data(
+        self,
+        colors: Dict[int, Tuple[float, float, float, float]]
+    ) -> bytearray:
+        """Build RGB channel data section."""
+        data = bytearray()
+        for channel_id in sorted(self._channels.keys()):
+            r, g, b = self._extract_rgb(colors, channel_id)
+            data.append(channel_id)
+            data.extend(self._color_to_bytes(r))
+            data.extend(self._color_to_bytes(g))
+            data.extend(self._color_to_bytes(b))
+        return data
+
+    def _build_xy_channel_data(
+        self,
+        colors: Dict[int, Tuple[Tuple[float, float], int]]
+    ) -> bytearray:
+        """Build XY+Brightness channel data section."""
+        data = bytearray()
+        for channel_id in sorted(self._channels.keys()):
+            (x, y), brightness = self._extract_xy_brightness(colors, channel_id)
+            data.append(channel_id)
+            data.extend(self._color_to_bytes(x))
+            data.extend(self._color_to_bytes(y))
+            data.extend(self._brightness_to_bytes(brightness))
+        return data
+
+    def _extract_rgb(
+        self,
+        colors: Dict[int, Tuple[float, float, float, float]],
+        channel_id: int
+    ) -> Tuple[float, float, float]:
+        """Extract RGB values from colors dict."""
+        if channel_id in colors:
+            r, g, b, _ = colors[channel_id]
+            return r, g, b
+        return 0.0, 0.0, 0.0
+
+    def _extract_xy_brightness(
+        self,
+        colors: Dict[int, Tuple[Tuple[float, float], int]],
+        channel_id: int
+    ) -> Tuple[Tuple[float, float], int]:
+        """Extract XY and brightness values from colors dict."""
+        if channel_id in colors:
+            return colors[channel_id]
+        return (0.0, 0.0), 0
+
+    def _color_to_bytes(self, value: float) -> list[int]:
+        """Convert 0-1 float to 2 big-endian bytes."""
+        scaled = int(max(0, min(1, value)) * HueStreamProtocol.MAX_16BIT)
+        return [(scaled >> 8) & 0xFF, scaled & 0xFF]
+
+    def _brightness_to_bytes(self, brightness: int) -> list[int]:
+        """Convert 0-254 brightness to 2 big-endian bytes."""
+        scaled = int(max(0, min(254, brightness)) * HueStreamProtocol.BRIGHTNESS_SCALE)
+        return [(scaled >> 8) & 0xFF, scaled & 0xFF]
 
     def get_channel_positions(self) -> Dict[int, dict]:
         """Get mapping of channel IDs to their 3D positions.
@@ -429,15 +482,14 @@ class EntertainmentStream:
         Positions are normalized: x=-1 to 1 (left to right),
         y=-1 to 1 (front to back), z=0 to 1 (bottom to top)
         """
-        positions = {}
-        for channel_id, info in self.channels.items():
-            pos = info.get('position', {})
-            positions[channel_id] = {
-                'x': pos.get('x', 0),
-                'y': pos.get('y', 0),
-                'z': pos.get('z', 0)
+        return {
+            channel_id: {
+                'x': info.position.get('x', 0),
+                'y': info.position.get('y', 0),
+                'z': info.position.get('z', 0)
             }
-        return positions
+            for channel_id, info in self._channels.items()
+        }
 
     def map_zone_to_channel(self, zone_id: str) -> Optional[int]:
         """Map a screen zone ID to an entertainment channel ID based on position.
@@ -448,56 +500,69 @@ class EntertainmentStream:
         Returns:
             Best matching channel_id or None
         """
-        if not self.channels:
+        if not self._channels:
             return None
 
-        # Parse zone position
         try:
             edge, idx_str = zone_id.split('_')
             idx = int(idx_str)
         except ValueError:
             return None
 
-        # Map edge to expected x/y ranges
-        # Entertainment positions: x is left-right (-1 to 1), y is front-back
-        # For PC monitor setup: we'll use x and z (z is height)
-        edge_positions = {
+        edge_positions = self._get_edge_position_ranges()
+        if edge not in edge_positions:
+            return None
+
+        matching_channels = self._find_channels_for_edge(edge, edge_positions[edge])
+        
+        if not matching_channels:
+            return next(iter(self._channels.keys()), None)
+
+        # Sort and pick by index
+        matching_channels.sort(key=lambda c: c[1])
+        idx = min(idx, len(matching_channels) - 1)
+        return matching_channels[idx][0]
+
+    def _get_edge_position_ranges(self) -> Dict[str, dict]:
+        """Get position ranges for each screen edge."""
+        return {
             'top': {'z_min': 0.5, 'z_max': 1.0},
             'bottom': {'z_min': -1.0, 'z_max': -0.5},
             'left': {'x_min': -1.0, 'x_max': -0.5},
             'right': {'x_min': 0.5, 'x_max': 1.0}
         }
 
-        if edge not in edge_positions:
-            return None
-
-        # Find channels that match this edge
-        matching_channels = []
-        edge_range = edge_positions[edge]
-
-        for channel_id, info in self.channels.items():
-            pos = info.get('position', {})
+    def _find_channels_for_edge(
+        self,
+        edge: str,
+        edge_range: dict
+    ) -> list[tuple[int, float]]:
+        """Find channels matching the given edge."""
+        matching = []
+        
+        for channel_id, info in self._channels.items():
+            pos = info.position
             x = pos.get('x', 0)
             z = pos.get('z', 0)
 
-            matches = False
-            if edge in ('left', 'right'):
-                if edge_range['x_min'] <= x <= edge_range['x_max']:
-                    matches = True
-                    sort_key = z  # Sort by height for left/right
-            else:  # top/bottom
-                if edge_range['z_min'] <= z <= edge_range['z_max']:
-                    matches = True
-                    sort_key = x  # Sort by x position for top/bottom
-
+            matches, sort_key = self._channel_matches_edge(edge, edge_range, x, z)
             if matches:
-                matching_channels.append((channel_id, sort_key))
+                matching.append((channel_id, sort_key))
+        
+        return matching
 
-        if not matching_channels:
-            # Fallback: just return any channel
-            return list(self.channels.keys())[0] if self.channels else None
-
-        # Sort channels and pick the one matching the index
-        matching_channels.sort(key=lambda c: c[1])
-        idx = min(idx, len(matching_channels) - 1)
-        return matching_channels[idx][0]
+    def _channel_matches_edge(
+        self,
+        edge: str,
+        edge_range: dict,
+        x: float,
+        z: float
+    ) -> Tuple[bool, float]:
+        """Check if channel position matches edge, return (matches, sort_key)."""
+        if edge in ('left', 'right'):
+            if edge_range['x_min'] <= x <= edge_range['x_max']:
+                return True, z  # Sort by height for left/right
+        else:  # top/bottom
+            if edge_range['z_min'] <= z <= edge_range['z_max']:
+                return True, x  # Sort by x position for top/bottom
+        return False, 0.0

@@ -56,8 +56,8 @@ class ZoneProcessor:
 
             top_count = self.cols
             bottom_count = self.cols
-            left_count = max(1, self.rows // 2)
-            right_count = max(1, self.rows // 2)
+            left_count = self.rows
+            right_count = self.rows
 
             top_zone_width = width // top_count
             bottom_zone_width = width // bottom_count

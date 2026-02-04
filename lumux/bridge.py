@@ -8,16 +8,10 @@ import socket
 import time
 import urllib.error
 import urllib.request
-from datetime import datetime
 from typing import Dict, List, Optional
 
 from lumux.bridge_client import BridgeClient, BridgeError
-
-
-def _timed_print(*args, **kwargs):
-    """Print with timestamp prefix."""
-    prefix = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
-    print(prefix, *args, **kwargs)
+from lumux.utils.logging import timed_print
 
 
 class HueBridge:
@@ -199,7 +193,7 @@ class HueBridge:
         
         try:
             if self.client.set_light_color(light_id, xy, brightness, transition_time):
-                _timed_print(f"Set light {light_id} color to xy={xy}, brightness={brightness}")
+                timed_print(f"Set light {light_id} color to xy={xy}, brightness={brightness}")
         except BridgeError as e:
             print(f"Error setting light color: {e}")
 
@@ -223,7 +217,7 @@ class HueBridge:
 
         try:
             if self.client.set_light_gradient(light_id, fixed_points, brightness, transition_time):
-                _timed_print(f"Set light {light_id} gradient with {len(fixed_points)} points, brightness={brightness}")
+                timed_print(f"Set light {light_id} gradient with {len(fixed_points)} points, brightness={brightness}")
         except BridgeError as e:
             print(f"Error setting light gradient: {e}")
 
@@ -458,7 +452,7 @@ class HueBridge:
         
         try:
             if self.client.activate_entertainment_streaming(config_id):
-                _timed_print(f"Entertainment streaming activated for config {config_id}")
+                timed_print(f"Entertainment streaming activated for config {config_id}")
                 return True
             return False
         except BridgeError as e:
@@ -472,7 +466,7 @@ class HueBridge:
         
         try:
             if self.client.deactivate_entertainment_streaming(config_id):
-                _timed_print(f"Entertainment streaming deactivated for config {config_id}")
+                timed_print(f"Entertainment streaming deactivated for config {config_id}")
                 return True
             return False
         except BridgeError as e:

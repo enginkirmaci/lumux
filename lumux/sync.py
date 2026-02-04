@@ -4,13 +4,8 @@ import queue
 import threading
 import time
 from typing import Dict, Tuple, Optional
-from datetime import datetime
 
-
-def _timed_print(*args, **kwargs):
-    prefix = datetime.now().strftime("[%Y-%m-%d %H:%M:%S]")
-    print(prefix, *args, **kwargs)
-
+from lumux.utils.logging import timed_print
 from lumux.bridge import HueBridge
 from lumux.capture import ScreenCapture
 from lumux.zones import ZoneProcessor
@@ -55,14 +50,14 @@ class SyncController:
 
         # Build zone to channel mapping for entertainment streaming
         if self.entertainment_stream:
-            _timed_print(f"Entertainment stream object exists, connected={self.entertainment_stream.is_connected()}")
+            timed_print(f"Entertainment stream object exists, connected={self.entertainment_stream.is_connected()}")
             if self.entertainment_stream.is_connected():
                 self._build_zone_channel_mapping()
-                _timed_print(f"Using entertainment streaming with {len(self._zone_channel_map)} zone-channel mappings")
+                timed_print(f"Using entertainment streaming with {len(self._zone_channel_map)} zone-channel mappings")
             else:
-                _timed_print("Warning: Entertainment stream exists but not connected")
+                timed_print("Warning: Entertainment stream exists but not connected")
         else:
-            _timed_print("Warning: No entertainment stream configured")
+            timed_print("Warning: No entertainment stream configured")
 
         self.running = True
         self.thread = threading.Thread(target=self._sync_loop, daemon=True, name="SyncLoop")
@@ -77,7 +72,7 @@ class SyncController:
         channel_positions = self.entertainment_stream.get_channel_positions()
 
         if not channel_positions:
-            _timed_print("Warning: No channel positions available")
+            timed_print("Warning: No channel positions available")
             return
 
         # Get all zone IDs for ambilight layout
@@ -97,7 +92,7 @@ class SyncController:
             if channel_id is not None:
                 self._zone_channel_map[zone_id] = channel_id
 
-        _timed_print(f"Zone-channel mapping: {len(self._zone_channel_map)} zones mapped to {len(set(self._zone_channel_map.values()))} channels")
+        timed_print(f"Zone-channel mapping: {len(self._zone_channel_map)} zones mapped to {len(set(self._zone_channel_map.values()))} channels")
 
     def _find_best_channel_for_zone(self, zone_id: str, channel_positions: Dict[int, dict]) -> Optional[int]:
         """Find the best matching channel for a screen zone based on position."""
@@ -154,7 +149,7 @@ class SyncController:
         if self.thread:
             self.thread.join(timeout=3)
             if self.thread.is_alive():
-                _timed_print("Warning: Sync thread did not stop cleanly")
+                timed_print("Warning: Sync thread did not stop cleanly")
         
         # Stop the capture pipeline to release portal session
         if hasattr(self.capture, 'stop_pipeline'):
@@ -203,13 +198,13 @@ class SyncController:
 
                 # Debug: occasionally log the effective target and measured FPS
                 if self._stats['frame_count'] % 100 == 0:
-                    _timed_print(f"Sync target FPS={fps_target}, target_delay={target_delay:.4f}s, measured_fps={self._stats['fps']:.1f}")
+                    timed_print(f"Sync target FPS={fps_target}, target_delay={target_delay:.4f}s, measured_fps={self._stats['fps']:.1f}")
 
             except KeyboardInterrupt:
                 break
             except Exception as e:
                 self._stats['errors'] += 1
-                _timed_print(f"Sync loop error: {e}")
+                timed_print(f"Sync loop error: {e}")
                 self._queue_status('error', str(e), None)
                 time.sleep(1)
 
@@ -265,7 +260,7 @@ class SyncController:
 
         # Log periodic timing summary to help diagnose bottlenecks
         if self._stats['frame_count'] % 30 == 0:
-            _timed_print(f"[timings] capture={self._stats['last_stage_times']['capture']}s zones={self._stats['last_stage_times']['zones']}s analyze={self._stats['last_stage_times']['analyze']}s smooth={self._stats['last_stage_times']['smooth']}s update={self._stats['last_stage_times']['update']}s total={self._stats['last_stage_times']['total']}s")
+            timed_print(f"[timings] capture={self._stats['last_stage_times']['capture']}s zones={self._stats['last_stage_times']['zones']}s analyze={self._stats['last_stage_times']['analyze']}s smooth={self._stats['last_stage_times']['smooth']}s update={self._stats['last_stage_times']['update']}s total={self._stats['last_stage_times']['total']}s")
 
         # Send RGB colors to GUI for preview, not XY colors
         self._queue_status('status', 'syncing', zone_colors)
@@ -277,7 +272,7 @@ class SyncController:
 
         if not self.entertainment_stream or not self.entertainment_stream.is_connected():
             if self._stats['frame_count'] % 300 == 0:
-                _timed_print("Warning: Entertainment stream not connected, skipping update")
+                timed_print("Warning: Entertainment stream not connected, skipping update")
             return
 
         # Convert zone colors to channel colors

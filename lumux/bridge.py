@@ -3,7 +3,11 @@
 Refactored to use unified BridgeClient instead of python-hue-v2.
 """
 
+import json
 import socket
+import time
+import urllib.error
+import urllib.request
 from datetime import datetime
 from typing import Dict, List, Optional
 
@@ -263,9 +267,12 @@ class HueBridge:
         }
 
     @classmethod
-    def discover_bridges(cls) -> List[str]:
+    def discover_bridges(cls, timeout: float = 5.0) -> List[str]:
         """Discover Hue bridges on local network using SSDP.
 
+        Args:
+            timeout: Discovery timeout in seconds
+            
         Returns:
             List of bridge IP addresses
         """

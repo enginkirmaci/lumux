@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <component type="desktop-application">
   <id>io.github.enginkirmaci.lumux</id>
-  <name>Lumux for Philips Hue Sync</name>
-  <summary>Real-time Philips Hue sync with your screen</summary>
+  <name>Lumux</name>
+  <summary>Philips Hue Sync for Linux</summary>
 
   <metadata_license>CC0-1.0</metadata_license>
   <project_license>MIT</project_license>
@@ -18,7 +18,7 @@
 
   <description>
     <p>
-      Lumux for Philips Hue Sync is a lightweight desktop app that analyzes the colors on your screen
+      Lumux is a lightweight desktop app that analyzes the colors on your screen
       and streams them to a Philips Hue Entertainment area for an "ambilight" effect.
     </p>
     <p>
@@ -49,11 +49,32 @@
     </screenshot>
     <screenshot>
       <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.2.0/screenshots/screenshot2.png</image>
-      <caption>Settings and configuration</caption>
+      <caption>Bridge configuration</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.2.0/screenshots/screenshot3.png</image>
+      <caption>General configuration</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.2.0/screenshots/screenshot4.png</image>
+      <caption>Capture configuration</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.2.0/screenshots/screenshot5.png</image>
+      <caption>Zones configuration</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.2.0/screenshots/screenshot6.png</image>
+      <caption>Sync configuration</caption>
     </screenshot>
   </screenshots>
 
   <content_rating type="oars-1.1"/>
+
+  <branding>
+    <color type="primary" scheme_preference="light">#ba85d5</color>
+    <color type="primary" scheme_preference="dark">#ba85d5</color>
+  </branding>
 
   <releases>
     <release version="0.2.0" date="2026-02-01">

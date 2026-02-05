@@ -1,6 +1,6 @@
 [Desktop Entry]
-Name=Lumux for Philips Hue Sync
-Comment=Real-time Philips Hue screen sync (Wayland portal capture)
+Name=Lumux
+Comment=Philips Hue Sync for Linux on Wayland
 Exec=lumux
 Icon=io.github.enginkirmaci.lumux
 Terminal=false

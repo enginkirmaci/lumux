@@ -256,7 +256,7 @@ class SettingsManager:
 
         content = f"""[Desktop Entry]
 Type=Application
-Name=Lumux for Philips Hue Sync
+Name=Lumux
 Exec={exec_cmd}
 Icon=io.github.enginkirmaci.lumux
 Terminal=false

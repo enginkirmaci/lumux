@@ -322,7 +322,7 @@ class MainWindow(Adw.ApplicationWindow):
     def _on_about_clicked(self, button):
         """Show about dialog."""
         about = Adw.AboutDialog(
-            application_name="Lumux for Philips Hue Sync",
+            application_name="Lumux",
             application_icon="io.github.enginkirmaci.lumux",
             developer_name="Engin Kırmacı",
             version="0.2.0",

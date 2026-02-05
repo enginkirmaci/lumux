@@ -7,7 +7,7 @@ from pathlib import Path
 setup(
     name="lumux",
     version="0.2.0",
-    description="Lumux for Philips Hue Sync (Wayland)",
+    description="Philips Hue Sync for Linux on Wayland",
     author="Engin Kırmacı",
     license="MIT",
     packages=find_packages(),

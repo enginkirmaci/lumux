@@ -3,7 +3,7 @@
 from dataclasses import dataclass
 
 from config.settings_manager import SettingsManager
-from lumux.bridge import HueBridge
+from lumux.hue_bridge import HueBridge
 from lumux.capture import ScreenCapture
 from lumux.colors import ColorAnalyzer
 from lumux.entertainment import EntertainmentStream

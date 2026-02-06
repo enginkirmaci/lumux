@@ -15,7 +15,7 @@ from typing import Dict, Optional, Tuple, TYPE_CHECKING
 from lumux.utils.logging import timed_print
 
 if TYPE_CHECKING:
-    from lumux.bridge import HueBridge
+    from lumux.hue_bridge import HueBridge
 
 
 # HueStream protocol constants

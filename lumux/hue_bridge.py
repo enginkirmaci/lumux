@@ -261,12 +261,85 @@ class HueBridge:
         }
 
     @classmethod
-    def discover_bridges(cls, timeout: float = 5.0) -> List[str]:
-        """Discover Hue bridges on local network using SSDP.
+    def discover_bridges(
+        cls,
+        timeout: float = 5.0,
+        max_retries: int = 1,
+        use_ssdp: bool = True,
+        use_mdns: bool = True,
+        use_nupnp: bool = True
+    ) -> List[str]:
+        """Discover Hue bridges on local network using multiple methods.
+
+        Tries SSDP, mDNS, and N-UPnP discovery methods. Retries the entire
+        discovery process if no bridges are found.
+
+        Args:
+            timeout: Discovery timeout in seconds per method
+            max_retries: Maximum number of discovery attempts
+            use_ssdp: Enable SSDP/UPnP discovery (local network multicast)
+            use_mdns: Enable mDNS/Zeroconf discovery (_hue._tcp)
+            use_nupnp: Enable N-UPnP cloud discovery (requires internet)
+
+        Returns:
+            List of unique bridge IP addresses
+        """
+        bridges = []
+        attempt = 0
+
+        while attempt < max_retries:
+            attempt += 1
+            print(f"Discovery attempt {attempt}/{max_retries}...")
+
+            # Try SSDP first (fastest local method)
+            if use_ssdp:
+                try:
+                    ssdp_bridges = cls._discover_ssdp(timeout)
+                    for ip in ssdp_bridges:
+                        if ip not in bridges:
+                            bridges.append(ip)
+                except Exception as e:
+                    print(f"SSDP discovery error: {e}")
+
+            # Try mDNS if SSDP didn't find anything or as additional source
+            if use_mdns:
+                try:
+                    mdns_bridges = cls._discover_mdns(timeout)
+                    for ip in mdns_bridges:
+                        if ip not in bridges:
+                            bridges.append(ip)
+                except Exception as e:
+                    print(f"mDNS discovery error: {e}")
+
+            # Try N-UPnP cloud discovery last
+            if use_nupnp:
+                try:
+                    nupnp_bridges = cls._discover_nupnp()
+                    for ip in nupnp_bridges:
+                        if ip not in bridges:
+                            bridges.append(ip)
+                except Exception as e:
+                    print(f"N-UPnP discovery error: {e}")
+
+            # If we found bridges, no need to retry
+            if bridges:
+                break
+
+            # Wait a bit before retrying (exponential backoff)
+            if attempt < max_retries:
+                delay = min(2 ** (attempt - 1), 10)  # Max 10 second delay
+                print(f"No bridges found, waiting {delay}s before retry...")
+                time.sleep(delay)
+
+        return bridges
+
+    @classmethod
+    def _discover_ssdp(cls, timeout: float = 5.0) -> List[str]:
+        """Discover Hue bridges using SSDP/UPnP multicast.
 
         Args:
             timeout: Discovery timeout in seconds
-            
+
         Returns:
             List of bridge IP addresses
         """

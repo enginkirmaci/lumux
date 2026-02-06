@@ -5,7 +5,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw
 from pathlib import Path
-from lumux.bridge import HueBridge
+from lumux.hue_bridge import HueBridge
 from lumux.app_context import AppContext
 from config.settings_manager import is_running_in_flatpak
 from gui.bridge_wizard import BridgeWizard

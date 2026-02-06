@@ -6,7 +6,7 @@ import time
 from typing import Dict, Tuple, Optional
 
 from lumux.utils.logging import timed_print
-from lumux.bridge import HueBridge
+from lumux.hue_bridge import HueBridge
 from lumux.capture import ScreenCapture
 from lumux.zones import ZoneProcessor
 from lumux.colors import ColorAnalyzer

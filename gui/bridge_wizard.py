@@ -5,7 +5,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GObject, GLib
 from typing import List, Optional, Callable
-from lumux.bridge import HueBridge
+from lumux.hue_bridge import HueBridge
 
 
 class BridgeWizard(Adw.NavigationPage):
@@ -314,7 +314,7 @@ class BridgeWizard(Adw.NavigationPage):
     def _discover_worker(self):
         """Worker thread for bridge discovery."""
         try:
-            bridges = HueBridge.discover_bridges(max_retries=3, timeout=5.0)
+            bridges = HueBridge.discover_bridges(timeout=5.0)
             GLib.idle_add(self._on_discover_complete, bridges)
         except Exception as e:
             GLib.idle_add(self._on_discover_error, str(e))

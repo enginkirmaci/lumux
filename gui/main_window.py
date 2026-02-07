@@ -325,7 +325,7 @@ class MainWindow(Adw.ApplicationWindow):
             application_name="Lumux",
             application_icon="io.github.enginkirmaci.lumux",
             developer_name="Engin Kırmacı",
-            version="0.2.0",
+            version="0.3.0",
             comments=("Sync your Philips Hue lights with your screen in real time. "
                       "Lumux captures screen content, maps it to your configured entertainment "
                       "zones on the Hue bridge, and streams low-latency color updates to create "

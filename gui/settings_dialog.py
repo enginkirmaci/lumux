@@ -3,7 +3,7 @@
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw
+from gi.repository import Gtk, Adw, Gdk
 from pathlib import Path
 from lumux.hue_bridge import HueBridge
 from lumux.app_context import AppContext
@@ -129,14 +129,9 @@ class SettingsDialog(Adw.PreferencesDialog):
         is_autostart_enabled = self.settings.is_autostart_enabled()
         self.startup_row.set_active(is_autostart_enabled)
         
-        # Set subtitle based on Flatpak status
-        if is_running_in_flatpak():
-            # Check if we have host filesystem access
-            autostart_dir = Path.home() / '.config' / 'autostart'
-            if autostart_dir.exists():
-                self.startup_row.set_subtitle("Launch Lumux when you log in (Flatpak with host access)")
-            else:
-                self.startup_row.set_subtitle("Launch Lumux when you log in (requires filesystem=host permission)")
+        # Set subtitle
+        if is_autostart_enabled:
+            self.startup_row.set_subtitle("Launch Lumux when you log in (enabled)")
         else:
             self.startup_row.set_subtitle("Launch Lumux when you log in")
         
@@ -386,29 +381,80 @@ class SettingsDialog(Adw.PreferencesDialog):
         """Handle startup toggle change immediately."""
         state = switch.get_active()
         if state:
-            result = self.settings.enable_autostart()
-            if not result and is_running_in_flatpak():
-                # Show a toast or update subtitle if failed in Flatpak
-                self.startup_row.set_subtitle("Failed to enable. Run: flatpak override --user --filesystem=host io.github.enginkirmaci.lumux")
-                # Revert the switch
-                switch.set_active(False)
-            else:
-                self.settings.ui.start_at_startup = True
-                if is_running_in_flatpak():
-                    self.startup_row.set_subtitle("Launch Lumux when you log in (autostart enabled)")
+            try:
+                result = self.settings.enable_autostart()
+                if result:
+
+                    self.settings.ui.start_at_startup = True
+                    self.startup_row.set_subtitle("Launch Lumux when you log in (enabled)")
                 else:
-                    self.startup_row.set_subtitle("Launch Lumux when you log in")
+                    # Failed to enable but not a permission error (e.g., venv)
+
+                    self._show_flatpak_permission_dialog()
+                    switch.set_active(False)
+            except PermissionError:
+                # Flatpak without host filesystem access - show permission dialog
+                switch.set_active(False)
+                self._show_flatpak_permission_dialog()
         else:
             self.settings.disable_autostart()
             self.settings.ui.start_at_startup = False
-            if is_running_in_flatpak():
-                autostart_dir = Path.home() / '.config' / 'autostart'
-                if autostart_dir.exists():
-                    self.startup_row.set_subtitle("Launch Lumux when you log in (Flatpak with host access)")
-                else:
-                    self.startup_row.set_subtitle("Launch Lumux when you log in (requires filesystem=host permission)")
-            else:
-                self.startup_row.set_subtitle("Launch Lumux when you log in")
+            self.startup_row.set_subtitle("Launch Lumux when you log in")
+
+    def _show_flatpak_permission_dialog(self):
+        """Show dialog explaining how to grant Flatpak permission for autostart."""
+        dialog = Adw.MessageDialog(
+            transient_for=self._parent,
+            heading="Permission Required",
+            body="Lumux needs access to your home directory to enable automatic startup. This permission allows Lumux to create a startup entry in your system.",
+        )
+        dialog.set_default_size(440, -1)
+        
+        # Add the command as a selectable label
+        command = "flatpak override --user --filesystem=host io.github.enginkirmaci.lumux"
+        
+        dialog.add_response("copy", "Copy Command")
+        dialog.add_response("close", "Close")
+        dialog.set_default_response("close")
+        dialog.set_close_response("close")
+        
+        # Add extra content with the command
+        extra_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        extra_box.set_margin_top(12)
+        
+        command_label = Gtk.Label(label="Run this command in your terminal:")
+        command_label.set_xalign(0)
+        command_label.add_css_class("dim-label")
+        extra_box.append(command_label)
+        
+        # Command entry (selectable)
+        command_entry = Gtk.Entry()
+        command_entry.set_text(command)
+        command_entry.set_editable(False)
+        command_entry.set_can_focus(True)
+        extra_box.append(command_entry)
+        
+        # Restart note
+        restart_label = Gtk.Label(label="After running the command, restart Lumux to apply the changes.")
+        restart_label.set_xalign(0)
+        restart_label.add_css_class("dim-label")
+        restart_label.set_wrap(True)
+        extra_box.append(restart_label)
+        
+        dialog.set_extra_child(extra_box)
+        
+        dialog.connect("response", self._on_flatpak_dialog_response, command)
+        dialog.present()
+    
+    def _on_flatpak_dialog_response(self, dialog, response, command):
+        """Handle Flatpak permission dialog response."""
+        if response == "copy":
+            # Copy command to clipboard
+            clipboard = self.get_clipboard()
+            clipboard.set(command)
+            
+            # Show a brief toast notification if available
+            # (Adw.Toast is not directly available on MessageDialog, so we just close)
 
     def _on_closed(self, dialog):
         """Handle dialog close - save settings."""

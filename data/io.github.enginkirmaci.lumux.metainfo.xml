@@ -44,27 +44,27 @@
 
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.2.0/screenshots/screenshot1.png</image>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.3.0/screenshots/screenshot1.png</image>
       <caption>Main application window with zone preview</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.2.0/screenshots/screenshot2.png</image>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.3.0/screenshots/screenshot2.png</image>
       <caption>Bridge configuration</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.2.0/screenshots/screenshot3.png</image>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.3.0/screenshots/screenshot3.png</image>
       <caption>General configuration</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.2.0/screenshots/screenshot4.png</image>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.3.0/screenshots/screenshot4.png</image>
       <caption>Capture configuration</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.2.0/screenshots/screenshot5.png</image>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.3.0/screenshots/screenshot5.png</image>
       <caption>Zones configuration</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.2.0/screenshots/screenshot6.png</image>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/v0.3.0/screenshots/screenshot6.png</image>
       <caption>Sync configuration</caption>
     </screenshot>
   </screenshots>
@@ -77,6 +77,17 @@
   </branding>
 
   <releases>
+    <release version="0.3.0" date="2026-02-07">
+      <description>
+        <p>New features and improvements:</p>
+        <ul>
+          <li>Added Bridge Setup Wizard with automatic discovery and authentication</li>
+          <li>Added black bar detection for letterbox/pillarbox video content</li>
+          <li>Replaced python-hue-v2 with unified BridgeClient for better reliability</li>
+          <li>Improved code structure and maintainability</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-02-01">
       <description>
         <p>New features and bug fixes:</p>

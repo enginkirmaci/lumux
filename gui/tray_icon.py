@@ -41,14 +41,7 @@ def _get_icon_path() -> str:
     # Fallback to icon name (requires icon to be in theme)
     return "io.github.enginkirmaci.lumux"
 
-
-def _is_running_in_flatpak() -> bool:
-    """Check if the application is running inside a Flatpak sandbox."""
-    return os.path.exists("/.flatpak-info")
-
-
 APP_ICON_PATH = _get_icon_path()
-
 
 class TrayIcon:
     """System tray icon with menu for Lumux application.

@@ -43,6 +43,13 @@ class SyncController:
             'last_update': time.time()
         }
 
+        # Callback for when sync stops (used for auto-switching to reading mode)
+        self._on_stop_callback: Optional[callable] = None
+
+    def set_on_stop_callback(self, callback: callable):
+        """Set callback to be called when sync stops."""
+        self._on_stop_callback = callback
+
     def start(self):
         """Start sync thread."""
         if self.running:
@@ -154,6 +161,13 @@ class SyncController:
         # Stop the capture pipeline to release portal session
         if hasattr(self.capture, 'stop_pipeline'):
             self.capture.stop_pipeline()
+        
+        # Call stop callback if set (for auto-switching to reading mode)
+        if self._on_stop_callback:
+            try:
+                self._on_stop_callback()
+            except Exception as e:
+                timed_print(f"Error in sync stop callback: {e}")
 
     def is_running(self) -> bool:
         """Check if sync is running."""

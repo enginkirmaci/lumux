@@ -285,6 +285,55 @@ class SettingsDialog(Adw.PreferencesDialog):
         self.smoothing_row.set_value(self.settings.sync.smoothing_factor)
         color_group.add(self.smoothing_row)
 
+        # Reading Mode page
+        reading_page = Adw.PreferencesPage()
+        reading_page.set_title("Reading")
+        reading_page.set_icon_name("weather-clear-night-symbolic")
+        self.add(reading_page)
+
+        reading_group = Adw.PreferencesGroup()
+        reading_group.set_title("Reading Mode")
+        reading_group.set_description("Static lighting for reading and relaxation")
+        reading_page.add(reading_group)
+
+        # Default color row
+        color_row = Adw.ActionRow()
+        color_row.set_title("Default Color")
+        color_row.set_subtitle("Color used when activating reading mode")
+        
+        self.reading_color_btn = Gtk.ColorDialogButton()
+        color_dialog = Gtk.ColorDialog()
+        color_dialog.set_title("Select Default Reading Color")
+        self.reading_color_btn.set_dialog(color_dialog)
+        # Set current color from settings
+        rgba = Gdk.RGBA()
+        xy = self.settings.reading_mode.color_xy
+        # Approximate XY to RGB conversion for display
+        r, g, b = self._xy_to_rgb(xy[0], xy[1])
+        rgba.red = r
+        rgba.green = g
+        rgba.blue = b
+        rgba.alpha = 1.0
+        self.reading_color_btn.set_rgba(rgba)
+        self.reading_color_btn.set_valign(Gtk.Align.CENTER)
+        color_row.add_suffix(self.reading_color_btn)
+        reading_group.add(color_row)
+
+        # Default brightness
+        self.reading_brightness_row = Adw.SpinRow.new_with_range(0, 254, 1)
+        self.reading_brightness_row.set_title("Default Brightness")
+        self.reading_brightness_row.set_subtitle("Brightness level for reading mode (0-254)")
+        self.reading_brightness_row.set_digits(0)
+        self.reading_brightness_row.set_value(self.settings.reading_mode.brightness)
+        reading_group.add(self.reading_brightness_row)
+
+        # Auto-activate reading mode
+        self.reading_auto_row = Adw.SwitchRow()
+        self.reading_auto_row.set_title("Auto-activate on Stop")
+        self.reading_auto_row.set_subtitle("Automatically switch to reading mode when video sync stops")
+        self.reading_auto_row.set_active(self.settings.reading_mode.auto_activate)
+        reading_group.add(self.reading_auto_row)
+
         # Connect close signal to save settings
         self.connect("closed", self._on_closed)
 
@@ -460,6 +509,57 @@ class SettingsDialog(Adw.PreferencesDialog):
         """Handle dialog close - save settings."""
         self._save_settings()
 
+    def _xy_to_rgb(self, x: float, y: float) -> tuple:
+        """Convert CIE XY color coordinates to RGB (approximate)."""
+        if y == 0:
+            return (1.0, 1.0, 1.0)
+        
+        # Convert xy to XYZ
+        Y = 1.0
+        X = (Y / y) * x
+        Z = (Y / y) * (1 - x - y)
+        
+        # Convert XYZ to RGB (sRGB D65)
+        r = X * 3.2406 + Y * -1.5372 + Z * -0.4986
+        g = X * -0.9689 + Y * 1.8758 + Z * 0.0415
+        b = X * 0.0557 + Y * -0.2040 + Z * 1.0570
+        
+        # Apply gamma correction
+        def gamma_correct(c):
+            if c <= 0.0031308:
+                return 12.92 * c
+            else:
+                return 1.055 * pow(c, 1/2.4) - 0.055
+        
+        r = gamma_correct(r)
+        g = gamma_correct(g)
+        b = gamma_correct(b)
+        
+        # Clamp to 0-1
+        return (max(0.0, min(1.0, r)), max(0.0, min(1.0, g)), max(0.0, min(1.0, b)))
+
+    def _rgb_to_xy(self, r: float, g: float, b: float) -> tuple:
+        """Convert RGB to CIE XY color coordinates."""
+        # Apply gamma correction
+        r = pow(r, 2.4) if r > 0.04045 else r / 12.92
+        g = pow(g, 2.4) if g > 0.04045 else g / 12.92
+        b = pow(b, 2.4) if b > 0.04045 else b / 12.92
+        
+        # Convert to XYZ
+        X = r * 0.664511 + g * 0.154324 + b * 0.162028
+        Y = r * 0.283881 + g * 0.668433 + b * 0.047685
+        Z = r * 0.000088 + g * 0.072310 + b * 0.986039
+        
+        # Convert to xy
+        sum_xyz = X + Y + Z
+        if sum_xyz == 0:
+            return (0.0, 0.0)
+        
+        x = X / sum_xyz
+        y = Y / sum_xyz
+        
+        return (max(0.0, min(1.0, x)), max(0.0, min(1.0, y)))
+
     def _save_settings(self):
         """Save all settings from the dialog."""
         self.settings.hue.bridge_ip = self.ip_row.get_text()
@@ -519,5 +619,12 @@ class SettingsDialog(Adw.PreferencesDialog):
             self.settings.ui.minimize_to_tray_on_sync = bool(self.minimize_row.get_active())
         except Exception:
             pass
+        
+        # Reading mode settings
+        rgba = self.reading_color_btn.get_rgba()
+        xy = self._rgb_to_xy(rgba.red, rgba.green, rgba.blue)
+        self.settings.reading_mode.color_xy = xy
+        self.settings.reading_mode.brightness = int(self.reading_brightness_row.get_value())
+        self.settings.reading_mode.auto_activate = bool(self.reading_auto_row.get_active())
         
         self.settings.save()

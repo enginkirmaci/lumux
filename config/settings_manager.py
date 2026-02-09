@@ -60,6 +60,14 @@ class BlackBarSettings:
 
 
 @dataclass
+class ReadingModeSettings:
+    color_xy: tuple = field(default_factory=lambda: (0.5, 0.4))  # Warm white default
+    brightness: int = 150  # 0-254
+    auto_activate: bool = True  # Auto-switch to reading mode when video sync stops
+    light_ids: List[str] = field(default_factory=list)  # Explicit light IDs for reading mode (empty = auto)
+
+
+@dataclass
 class Settings:
     hue: HueSettings = field(default_factory=HueSettings)
     capture: CaptureSettings = field(default_factory=CaptureSettings)
@@ -67,6 +75,7 @@ class Settings:
     sync: SyncSettings = field(default_factory=SyncSettings)
     ui: UISettings = field(default_factory=UISettings)
     black_bar: BlackBarSettings = field(default_factory=BlackBarSettings)
+    reading_mode: ReadingModeSettings = field(default_factory=ReadingModeSettings)
 
 
 class SettingsManager:
@@ -127,6 +136,10 @@ class SettingsManager:
     def black_bar(self) -> BlackBarSettings:
         return self._settings.black_bar
 
+    @property
+    def reading_mode(self) -> ReadingModeSettings:
+        return self._settings.reading_mode
+
     def get_zone_mapping(self) -> ZoneMapping:
         """Return a ZoneMapping instance stored in the config directory.
 
@@ -151,6 +164,15 @@ class SettingsManager:
                 self._settings.ui = UISettings(**data.get('ui', {}))
                 # Black bar settings (optional)
                 self._settings.black_bar = BlackBarSettings(**data.get('black_bar', {}))
+                # Reading mode settings (optional)
+                reading_data = data.get('reading_mode', {})
+                # Handle tuple serialization for color_xy
+                if 'color_xy' in reading_data and isinstance(reading_data['color_xy'], list):
+                    reading_data['color_xy'] = tuple(reading_data['color_xy'])
+                # Handle light_ids serialization (ensure it's a list)
+                if 'light_ids' in reading_data and not isinstance(reading_data['light_ids'], list):
+                    reading_data['light_ids'] = []
+                self._settings.reading_mode = ReadingModeSettings(**reading_data)
             except (json.JSONDecodeError, TypeError) as e:
                 print(f"Error loading settings: {e}")
                 self._validate_settings()
@@ -169,7 +191,8 @@ class SettingsManager:
             'zones': asdict(self._settings.zones),
             'sync': asdict(self._settings.sync),
             'ui': asdict(self._settings.ui),
-            'black_bar': asdict(self._settings.black_bar)
+            'black_bar': asdict(self._settings.black_bar),
+            'reading_mode': asdict(self._settings.reading_mode)
         }
 
         with open(self._settings_file, 'w') as f:
@@ -227,6 +250,38 @@ class SettingsManager:
         self._settings.black_bar.threshold = max(0, min(50, self._settings.black_bar.threshold))
         self._settings.black_bar.detection_rate = max(1, min(120, self._settings.black_bar.detection_rate))
         self._settings.black_bar.smooth_factor = max(0.1, min(1.0, self._settings.black_bar.smooth_factor))
+
+        # Reading mode settings validation
+        try:
+            if isinstance(self._settings.reading_mode.color_xy, (list, tuple)) and len(self._settings.reading_mode.color_xy) == 2:
+                x, y = self._settings.reading_mode.color_xy
+                self._settings.reading_mode.color_xy = (float(x), float(y))
+            else:
+                self._settings.reading_mode.color_xy = (0.5, 0.4)
+        except Exception:
+            self._settings.reading_mode.color_xy = (0.5, 0.4)
+        
+        # Clamp XY to valid CIE color space range
+        x, y = self._settings.reading_mode.color_xy
+        self._settings.reading_mode.color_xy = (max(0.0, min(1.0, x)), max(0.0, min(1.0, y)))
+        
+        try:
+            self._settings.reading_mode.brightness = int(self._settings.reading_mode.brightness)
+        except Exception:
+            self._settings.reading_mode.brightness = 150
+        self._settings.reading_mode.brightness = max(0, min(254, self._settings.reading_mode.brightness))
+        
+        try:
+            self._settings.reading_mode.auto_activate = bool(self._settings.reading_mode.auto_activate)
+        except Exception:
+            self._settings.reading_mode.auto_activate = True
+        
+        # Validate light_ids is a list
+        try:
+            if not isinstance(self._settings.reading_mode.light_ids, list):
+                self._settings.reading_mode.light_ids = []
+        except Exception:
+            self._settings.reading_mode.light_ids = []
 
     def _ensure_config_dir(self):
         """Ensure config directory exists."""

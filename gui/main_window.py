@@ -6,6 +6,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, GLib, Adw, Gdk, Gio, GdkPixbuf
 from lumux.app_context import AppContext
+from lumux.mode_manager import Mode
 from gui.settings_dialog import SettingsDialog
 from gui.zone_preview_widget import ZonePreviewWidget
 from gui.tray_icon import TrayIcon
@@ -21,15 +22,21 @@ class MainWindow(Adw.ApplicationWindow):
         super().__init__(application=app)
         self.app_context = app_context
         self.sync_controller = app_context.sync_controller
+        self.mode_manager = app_context.mode_manager
         self.settings = app_context.settings
         self.bridge_connected = False
-        self._is_syncing = False
+        self._current_mode = Mode.OFF
         # Window size presets
-        self._preview_size = (800, 640)
-        self._compact_size = (500, 400)
+        self._preview_size = (800, 700)
+        self._compact_size = (500, 500)
+        # Reading mode now uses same size as video mode for consistency
+        self._reading_mode_size = (800, 700)
         
         # System tray icon
         self._tray_icon = None
+
+        # Connect mode change callback
+        self.mode_manager.set_mode_changed_callback(self._on_mode_changed)
 
         self._setup_app_icon()
         self._setup_css()
@@ -85,6 +92,10 @@ class MainWindow(Adw.ApplicationWindow):
                 background: linear-gradient(135deg, alpha(@accent_color, 0.15), alpha(@purple_3, 0.15));
                 border: 1px solid alpha(@accent_color, 0.4);
             }
+            .status-reading {
+                background: alpha(@yellow_3, 0.15);
+                border: 1px solid alpha(@yellow_3, 0.4);
+            }
             .preview-card {
                 background: alpha(@card_bg_color, 0.8);
                 padding: 8px;
@@ -114,6 +125,39 @@ class MainWindow(Adw.ApplicationWindow):
                 font-weight: 600;
                 letter-spacing: 0.5px;
                 opacity: 0.6;
+            }
+            .mode-toggle {
+                background: alpha(@card_bg_color, 0.6);
+                border-radius: 24px;
+                padding: 4px;
+            }
+            .reading-controls {
+                background: alpha(@card_bg_color, 0.6);
+                border-radius: 16px;
+                padding: 24px;
+            }
+            .reading-preset-btn {
+                min-width: 48px;
+                min-height: 48px;
+                border-radius: 24px;
+                padding: 0;
+                margin: 4px;
+            }
+            .reading-preset-btn:hover {
+                box-shadow: 0 0 0 3px alpha(@accent_color, 0.5);
+            }
+            .reading-preset-active {
+                box-shadow: 0 0 0 3px @accent_color;
+            }
+            .reading-label {
+                font-weight: 600;
+                font-size: 14px;
+            }
+            .reading-value-label {
+                font-feature-settings: "tnum";
+                min-width: 40px;
+                font-weight: 600;
+                opacity: 0.8;
             }
         """)
         Gtk.StyleContext.add_provider_for_display(
@@ -235,6 +279,27 @@ class MainWindow(Adw.ApplicationWindow):
         self.status_card.append(status_header)
         main_box.append(self.status_card)
 
+        # Mode toggle (Video / Reading) - moved under status for video mode
+        self.mode_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=4)
+        self.mode_box.add_css_class("mode-toggle")
+        self.mode_box.set_halign(Gtk.Align.CENTER)
+        self.mode_box.set_margin_top(8)
+        
+        self.video_mode_btn = Gtk.ToggleButton()
+        self.video_mode_btn.set_label("Video Mode")
+        self.video_mode_btn.set_size_request(120, 40)
+        self.video_mode_btn.connect("toggled", self._on_video_mode_toggled)
+        self.mode_box.append(self.video_mode_btn)
+        
+        self.reading_mode_btn = Gtk.ToggleButton()
+        self.reading_mode_btn.set_label("Reading Mode")
+        self.reading_mode_btn.set_size_request(120, 40)
+        self.reading_mode_btn.set_group(self.video_mode_btn)
+        self.reading_mode_btn.connect("toggled", self._on_reading_mode_toggled)
+        self.mode_box.append(self.reading_mode_btn)
+        
+        main_box.append(self.mode_box)
+
         # Zone preview section
         self.preview_group = Adw.PreferencesGroup()
         self.preview_group.set_title("Zone Preview")
@@ -257,13 +322,14 @@ class MainWindow(Adw.ApplicationWindow):
         # Control section
         control_box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
         
-        # Sync toggle button (large, prominent)
+        # Video mode controls (Start/Stop button)
+        self.video_controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=8)
+        
         self.sync_button = Gtk.Button()
         self.sync_button.add_css_class("control-button")
         self.sync_button.add_css_class("suggested-action")
         self.sync_button.add_css_class("pill")
         
-        # Create box with icon and label for the button
         self.sync_button_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         self.sync_button_box.set_halign(Gtk.Align.CENTER)
         self.sync_icon = Gtk.Image.new_from_icon_name("media-playback-start-symbolic")
@@ -275,18 +341,134 @@ class MainWindow(Adw.ApplicationWindow):
         self.sync_button.connect("clicked", self._on_sync_toggle)
         self.sync_button.set_halign(Gtk.Align.CENTER)
         self.sync_button.set_size_request(200, 48)
-        control_box.append(self.sync_button)
-
+        self.video_controls.append(self.sync_button)
+        control_box.append(self.video_controls)
         
+        # Reading mode controls (presets + color picker + brightness)
+        self.reading_controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
+        self.reading_controls.add_css_class("reading-controls")
+        
+        # Preset colors section
+        presets_title = Gtk.Label(label="Quick Presets")
+        presets_title.add_css_class("reading-label")
+        presets_title.set_halign(Gtk.Align.START)
+        self.reading_controls.append(presets_title)
+        
+        # Preset color buttons row
+        presets_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
+        presets_box.set_halign(Gtk.Align.CENTER)
+        presets_box.set_margin_bottom(8)
+        
+        # Define preset colors: (name, hex_color, tooltip)
+        self._reading_presets = [
+            ("warm_white", "#FFD6A5", "Warm White (2700K)"),
+            ("cool_white", "#F0F4FF", "Cool White (4000K)"),
+            ("daylight", "#FFFEF0", "Daylight (6500K)"),
+            ("candle", "#FF9B50", "Candlelight"),
+            ("sunset", "#FF7B7B", "Sunset"),
+            ("relax", "#A78BFA", "Relax"),
+            ("focus", "#60A5FA", "Focus"),
+            ("reading", "#34D399", "Reading"),
+        ]
+        self._preset_buttons = {}
+        
+        for preset_id, hex_color, tooltip in self._reading_presets:
+            btn = Gtk.Button()
+            btn.add_css_class("reading-preset-btn")
+            btn.set_tooltip_text(tooltip)
+            
+            # Create color swatch using a drawing area
+            swatch = Gtk.Box()
+            swatch.set_size_request(40, 40)
+            swatch.set_margin_start(4)
+            swatch.set_margin_end(4)
+            swatch.set_margin_top(4)
+            swatch.set_margin_bottom(4)
+            
+            # Apply color via CSS
+            css_provider = Gtk.CssProvider()
+            css_provider.load_from_string(f"""
+                box {{
+                    background-color: {hex_color};
+                    border-radius: 20px;
+                }}
+            """)
+            swatch.get_style_context().add_provider(css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+            
+            btn.set_child(swatch)
+            btn.connect("clicked", self._on_preset_clicked, preset_id, hex_color)
+            presets_box.append(btn)
+            self._preset_buttons[preset_id] = btn
+        
+        self.reading_controls.append(presets_box)
+        
+        # Custom color and brightness in one row
+        controls_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=24)
+        controls_row.set_halign(Gtk.Align.CENTER)
+        controls_row.set_margin_top(8)
+        
+        # Custom color
+        color_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        color_label = Gtk.Label(label="Color")
+        color_label.add_css_class("reading-label")
+        color_box.append(color_label)
+        
+        self.color_btn = Gtk.ColorDialogButton()
+        color_dialog = Gtk.ColorDialog()
+        color_dialog.set_title("Select Reading Light Color")
+        self.color_btn.set_dialog(color_dialog)
+        # Set default from settings or warm white
+        rgba = Gdk.RGBA()
+        default_xy = self.settings.reading_mode.color_xy
+        default_rgb = self._xy_to_rgb(default_xy[0], default_xy[1])
+        rgba.parse(f"#{default_rgb[0]:02x}{default_rgb[1]:02x}{default_rgb[2]:02x}")
+        self.color_btn.set_rgba(rgba)
+        self.color_btn.connect("notify::rgba", self._on_color_changed)
+        color_box.append(self.color_btn)
+        controls_row.append(color_box)
+        
+        # Brightness
+        brightness_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
+        brightness_label = Gtk.Label(label="Brightness")
+        brightness_label.add_css_class("reading-label")
+        brightness_box.append(brightness_label)
+        
+        self.brightness_value_label = Gtk.Label(label=str(self.settings.reading_mode.brightness))
+        self.brightness_value_label.add_css_class("reading-value-label")
+        brightness_box.append(self.brightness_value_label)
+        
+        self.brightness_scale = Gtk.Scale(orientation=Gtk.Orientation.HORIZONTAL)
+        self.brightness_scale.set_range(0, 254)
+        self.brightness_scale.set_value(self.settings.reading_mode.brightness)
+        self.brightness_scale.set_size_request(180, -1)
+        self.brightness_scale.set_draw_value(False)
+        self.brightness_scale.connect("value-changed", self._on_brightness_changed)
+        brightness_box.append(self.brightness_scale)
+        controls_row.append(brightness_box)
+        
+        self.reading_controls.append(controls_row)
+        
+        # Apply button for reading mode
+        self.apply_reading_btn = Gtk.Button()
+        self.apply_reading_btn.set_label("Apply Lighting")
+        self.apply_reading_btn.add_css_class("suggested-action")
+        self.apply_reading_btn.add_css_class("pill")
+        self.apply_reading_btn.set_size_request(160, 44)
+        self.apply_reading_btn.set_halign(Gtk.Align.CENTER)
+        self.apply_reading_btn.set_margin_top(8)
+        self.apply_reading_btn.connect("clicked", self._on_apply_reading)
+        self.reading_controls.append(self.apply_reading_btn)
+        
+        self.reading_controls.set_visible(False)
+        control_box.append(self.reading_controls)
 
         main_box.append(control_box)
 
-        # Apply initial window sizing based on preview setting
+        # Apply initial window sizing based on mode and preview setting
         self._apply_window_size()
 
     def _update_sync_button_state(self, is_syncing: bool):
         """Update sync button appearance based on state."""
-        self._is_syncing = is_syncing
         self.sync_button.remove_css_class("suggested-action")
         self.sync_button.remove_css_class("destructive-action")
 
@@ -308,16 +490,182 @@ class MainWindow(Adw.ApplicationWindow):
         self.status_card.remove_css_class("status-connected")
         self.status_card.remove_css_class("status-disconnected")
         self.status_card.remove_css_class("status-syncing")
+        self.status_card.remove_css_class("status-reading")
         
         if state == "syncing":
             self.status_card.add_css_class("status-syncing")
             self.status_icon.set_from_icon_name("emblem-synchronizing-symbolic")
+        elif state == "reading":
+            self.status_card.add_css_class("status-reading")
+            self.status_icon.set_from_icon_name("weather-clear-night-symbolic")
         elif state == "connected":
             self.status_card.add_css_class("status-connected")
             self.status_icon.set_from_icon_name("network-transmit-receive-symbolic")
         else:
             self.status_card.add_css_class("status-disconnected")
             self.status_icon.set_from_icon_name("network-offline-symbolic")
+
+    def _on_video_mode_toggled(self, button):
+        """Handle video mode button toggle."""
+        if button.get_active():
+            self._switch_to_video_mode()
+
+    def _on_reading_mode_toggled(self, button):
+        """Handle reading mode button toggle."""
+        if button.get_active():
+            self._switch_to_reading_mode()
+
+    def _switch_to_video_mode(self):
+        """Switch UI to video mode."""
+        self.video_controls.set_visible(True)
+        self.reading_controls.set_visible(False)
+        self.preview_group.set_visible(self.settings.zones.show_preview)
+        self.stats_box.set_visible(True)
+        self._apply_window_size()
+
+    def _switch_to_reading_mode(self):
+        """Switch UI to reading mode."""
+        self.video_controls.set_visible(False)
+        self.reading_controls.set_visible(True)
+        self.preview_group.set_visible(False)  # No preview in reading mode
+        self.stats_box.set_visible(False)
+        self._apply_window_size()
+
+    def _on_mode_changed(self, mode: Mode):
+        """Called when mode manager changes mode."""
+        self._current_mode = mode
+        
+        if mode == Mode.VIDEO:
+            self.video_mode_btn.set_active(True)
+            self.status_label.set_text("Video Mode")
+            self.status_subtitle.set_text("Syncing screen colors to lights")
+            self._update_status_card("syncing")
+            self._switch_to_video_mode()
+        elif mode == Mode.READING:
+            self.reading_mode_btn.set_active(True)
+            self.status_label.set_text("Reading Mode")
+            self.status_subtitle.set_text("Static lighting active")
+            self._update_status_card("reading")
+            self._update_sync_button_state(False)  # Sync is not running in reading mode
+            self.sync_button.set_sensitive(True)
+        else:  # OFF
+            self._update_sync_button_state(False)
+            self.sync_button.set_sensitive(True)
+            if self.video_mode_btn.get_active():
+                self.status_label.set_text("Ready")
+                self.status_subtitle.set_text("Select a mode to begin")
+                self._update_status_card("connected")
+            else:
+                self.status_label.set_text("Ready")
+                self.status_subtitle.set_text("Select a mode to begin")
+                self._update_status_card("connected")
+
+    def _on_color_changed(self, button, param):
+        """Handle color picker change."""
+        # Color is applied when user clicks Apply button
+        pass
+
+    def _on_brightness_changed(self, scale):
+        """Handle brightness slider change."""
+        # Update the value label
+        if hasattr(self, 'brightness_value_label'):
+            self.brightness_value_label.set_text(str(int(scale.get_value())))
+    
+    def _on_preset_clicked(self, button, preset_id: str, hex_color: str):
+        """Handle preset color button click."""
+        # Update color button
+        rgba = Gdk.RGBA()
+        rgba.parse(hex_color)
+        self.color_btn.set_rgba(rgba)
+        
+        # Clear active state from all presets
+        for btn in self._preset_buttons.values():
+            btn.remove_css_class("reading-preset-active")
+        
+        # Add active state to clicked preset
+        button.add_css_class("reading-preset-active")
+        
+        # Auto-apply the preset
+        self._on_apply_reading(button)
+    
+    def _xy_to_rgb(self, x: float, y: float) -> tuple:
+        """Convert CIE XY to approximate RGB for color picker initialization.
+        
+        This is a simplified inverse of the RGB to XY conversion.
+        """
+        # Avoid division by zero
+        if y == 0:
+            return (255, 255, 255)
+        
+        # Convert xy to XYZ (assume Y=1 for brightness)
+        Y = 1.0
+        X = (x * Y) / y
+        Z = ((1 - x - y) * Y) / y
+        
+        # XYZ to RGB matrix (sRGB D65)
+        r = X *  3.2406 + Y * -1.5372 + Z * -0.4986
+        g = X * -0.9689 + Y *  1.8758 + Z *  0.0415
+        b = X *  0.0557 + Y * -0.2040 + Z *  1.0570
+        
+        # Apply gamma correction (inverse)
+        def gamma_correct(c):
+            if c > 0.0031308:
+                return 1.055 * (c ** (1.0 / 2.4)) - 0.055
+            else:
+                return 12.92 * c
+        
+        r = gamma_correct(r)
+        g = gamma_correct(g)
+        b = gamma_correct(b)
+        
+        # Clamp and convert to 0-255
+        r = max(0, min(1, r))
+        g = max(0, min(1, g))
+        b = max(0, min(1, b))
+        
+        return (int(r * 255), int(g * 255), int(b * 255))
+
+    def _on_apply_reading(self, button):
+        """Apply reading mode settings."""
+        rgba = self.color_btn.get_rgba()
+        brightness = int(self.brightness_scale.get_value())
+        
+        # Convert RGB to XY color space (approximate)
+        xy = self._rgb_to_xy(rgba.red, rgba.green, rgba.blue)
+        
+        # Save settings
+        self.settings.reading_mode.color_xy = xy
+        self.settings.reading_mode.brightness = brightness
+        self.settings.save()
+        
+        # Activate reading mode
+        if not self.mode_manager.is_reading_active():
+            self.mode_manager.switch_to_reading(xy=xy, brightness=brightness)
+        else:
+            # Update color if already active
+            self.mode_manager.get_reading_controller().update_color(xy=xy, brightness=brightness)
+
+    def _rgb_to_xy(self, r: float, g: float, b: float) -> tuple:
+        """Convert RGB to CIE XY color coordinates."""
+        # Apply gamma correction
+        r = pow(r, 2.4) if r > 0.04045 else r / 12.92
+        g = pow(g, 2.4) if g > 0.04045 else g / 12.92
+        b = pow(b, 2.4) if b > 0.04045 else b / 12.92
+        
+        # Convert to XYZ
+        X = r * 0.664511 + g * 0.154324 + b * 0.162028
+        Y = r * 0.283881 + g * 0.668433 + b * 0.047685
+        Z = r * 0.000088 + g * 0.072310 + b * 0.986039
+        
+        # Convert to xy
+        sum_xyz = X + Y + Z
+        if sum_xyz == 0:
+            return (0.0, 0.0)
+        
+        x = X / sum_xyz
+        y = Y / sum_xyz
+        
+        return (max(0.0, min(1.0, x)), max(0.0, min(1.0, y)))
 
     def _on_about_clicked(self, button):
         """Show about dialog."""
@@ -337,7 +685,7 @@ class MainWindow(Adw.ApplicationWindow):
 
     def _on_sync_toggle(self, button):
         """Toggle sync on/off."""
-        if self._is_syncing:
+        if self.sync_controller.is_running():
             self._on_stop_clicked(button)
         else:
             self._on_start_clicked(button)
@@ -358,6 +706,8 @@ class MainWindow(Adw.ApplicationWindow):
             self._update_status_card("connected")
             self.sync_button.set_sensitive(True)
             self.stats_box.set_visible(True)
+            self.video_mode_btn.set_sensitive(True)
+            self.reading_mode_btn.set_sensitive(True)
         else:
             if not status.configured:
                 self.status_label.set_text("Not Configured")
@@ -368,6 +718,8 @@ class MainWindow(Adw.ApplicationWindow):
             self._update_status_card("disconnected")
             self.sync_button.set_sensitive(False)
             self.stats_box.set_visible(False)
+            self.video_mode_btn.set_sensitive(False)
+            self.reading_mode_btn.set_sensitive(False)
 
         # Show the settings button when either disconnected or not configured
         if hasattr(self, 'open_bridge_settings_btn'):
@@ -375,9 +727,10 @@ class MainWindow(Adw.ApplicationWindow):
             self.open_bridge_settings_btn.set_visible(bool(show_btn))
 
     def _apply_window_size(self):
-        """Set default and attempt runtime resize according to `show_preview` setting."""
-        preview = getattr(self.settings.zones, 'show_preview', True)
-        if preview:
+        """Set default and attempt runtime resize according to current mode."""
+        if self._current_mode == Mode.READING or self.reading_mode_btn.get_active():
+            self.set_default_size(*self._reading_mode_size)
+        elif getattr(self.settings.zones, 'show_preview', True):
             self.set_default_size(*self._preview_size)
         else:
             self.set_default_size(*self._compact_size)
@@ -436,21 +789,14 @@ class MainWindow(Adw.ApplicationWindow):
         return True
 
     def _on_start_clicked(self, button):
-        """Start sync."""
+        """Start video sync."""
         if not self.bridge_connected:
             self.status_label.set_text("Cannot Start")
             self.status_subtitle.set_text("Bridge not connected")
             return
-            
-        if not self.sync_controller.is_running():
-            # Connect entertainment streaming first
-            if not self.app_context.start_entertainment():
-                self.status_label.set_text("Connection Failed")
-                self.status_subtitle.set_text("Check client_key and entertainment zone settings")
-                self._update_status_card("disconnected")
-                return
-            
-            self.sync_controller.start()
+        
+        # Use mode manager to switch to video mode
+        if self.mode_manager.switch_to_video():
             self._update_sync_button_state(True)
             self.sync_button.set_sensitive(True)
             self.status_label.set_text("Starting...")
@@ -465,26 +811,44 @@ class MainWindow(Adw.ApplicationWindow):
                         pass
             except Exception:
                 pass
+        else:
+            self.status_label.set_text("Connection Failed")
+            self.status_subtitle.set_text("Check entertainment zone settings")
+            self._update_status_card("disconnected")
 
     def _on_stop_clicked(self, button):
-        """Stop sync."""
-        if self.sync_controller.is_running():
+        """Stop video sync."""
+        if not self.sync_controller.is_running():
+            return
+            
+        # Check if auto-activate reading mode is enabled
+        auto_activate = (
+            getattr(self.settings, 'reading_mode', None) and 
+            getattr(self.settings.reading_mode, 'auto_activate', False)
+        )
+        
+        if auto_activate:
+            # Just stop sync - the callback will auto-activate reading mode
             self.sync_controller.stop()
-            # Disconnect entertainment streaming
-            self.app_context.stop_entertainment()
+            # UI will be updated via mode change callback
+        else:
+            # Turn off everything
+            self.mode_manager.turn_off(turn_off_lights=False)
             self._update_sync_button_state(False)
             self.sync_button.set_sensitive(True)
-            self.status_label.set_text("Stopping...")
-            self.status_subtitle.set_text("Disconnecting...")
-            # Restore window if it was hidden via minimize-on-sync
-            try:
-                if getattr(self.settings, 'ui', None) and getattr(self.settings.ui, 'minimize_to_tray_on_sync', False):
-                    try:
-                        self.present()
-                    except Exception:
-                        pass
-            except Exception:
-                pass
+            self.status_label.set_text("Stopped")
+            self.status_subtitle.set_text("Ready to sync")
+            self._update_status_card("ready")
+        
+        # Restore window if it was hidden via minimize-on-sync
+        try:
+            if getattr(self.settings, 'ui', None) and getattr(self.settings.ui, 'minimize_to_tray_on_sync', False):
+                try:
+                    self.present()
+                except Exception:
+                    pass
+        except Exception:
+            pass
 
     def _on_settings_clicked(self, button):
         """Open settings dialog."""
@@ -506,7 +870,9 @@ class MainWindow(Adw.ApplicationWindow):
 
     def do_close_request(self) -> bool:
         """Handle window close request."""
-        if self.sync_controller.is_running():
+        if hasattr(self, 'mode_manager'):
+            self.mode_manager.turn_off(turn_off_lights=False)
+        elif self.sync_controller.is_running():
             self.sync_controller.stop()
         
         if self.status_timeout_id:

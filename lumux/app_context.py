@@ -9,6 +9,7 @@ from lumux.colors import ColorAnalyzer
 from lumux.entertainment import EntertainmentStream
 from lumux.sync import SyncController
 from lumux.zones import ZoneProcessor
+from lumux.mode_manager import ModeManager
 
 
 @dataclass(frozen=True)
@@ -57,6 +58,19 @@ class AppContext:
             entertainment_stream=self.entertainment_stream
         )
 
+        # Mode manager for video/reading mode switching
+        self.mode_manager = ModeManager(
+            bridge=self.bridge,
+            sync_controller=self.sync_controller,
+            entertainment_stream=self.entertainment_stream,
+            reading_mode=settings.reading_mode
+        )
+        
+        # Connect sync stop callback for auto-switching to reading mode
+        self.sync_controller.set_on_stop_callback(
+            self.mode_manager.on_video_sync_stopped
+        )
+
     def start(self) -> BridgeStatus:
         """Start background workers and attempt bridge connection."""
         return self.get_bridge_status(attempt_connect=True)
@@ -80,11 +94,15 @@ class AppContext:
 
     def shutdown(self) -> None:
         """Stop background workers and any running sync."""
-        try:
-            if self.sync_controller.is_running():
-                self.sync_controller.stop()
-        finally:
-            self.stop_entertainment()
+        if hasattr(self, 'mode_manager'):
+            self.mode_manager.turn_off(turn_off_lights=False)
+        else:
+            # Fallback to manual cleanup
+            try:
+                if self.sync_controller.is_running():
+                    self.sync_controller.stop()
+            finally:
+                self.stop_entertainment()
 
     def apply_settings(self) -> None:
         """Apply current settings to live components."""
@@ -129,6 +147,10 @@ class AppContext:
                 )
                 # Update sync controller
                 self.sync_controller.entertainment_stream = self.entertainment_stream
+
+        # Update mode manager reading settings
+        if hasattr(self, 'mode_manager'):
+            self.mode_manager.reading_settings = self.settings.reading_mode
 
     def get_bridge_status(self, attempt_connect: bool = False) -> BridgeStatus:
         """Return current bridge status, optionally attempting a connection."""

@@ -256,16 +256,6 @@ class MainWindow(Adw.ApplicationWindow):
         fps_stat.append(self.fps_value)
         self.stats_box.append(fps_stat)
 
-        # Frames stat
-        frames_stat = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=2)
-        frames_label = Gtk.Label(label="FRAMES")
-        frames_label.add_css_class("stats-label")
-        frames_stat.append(frames_label)
-        self.frames_value = Gtk.Label(label="0")
-        self.frames_value.add_css_class("stats-value")
-        frames_stat.append(self.frames_value)
-        self.stats_box.append(frames_stat)
-
         # Add stats box into the header so it appears to the right
         status_header.append(self.stats_box)
 
@@ -805,7 +795,6 @@ class MainWindow(Adw.ApplicationWindow):
         stats = self.sync_controller.get_stats()
         if stats:
             self.fps_value.set_text(f"{stats['fps']:.1f}")
-            self.frames_value.set_text(f"{stats['frame_count']}")
 
         return True
 

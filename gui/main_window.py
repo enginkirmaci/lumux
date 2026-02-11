@@ -34,6 +34,9 @@ class MainWindow(Adw.ApplicationWindow):
         
         # System tray icon
         self._tray_icon = None
+        
+        # Brightness slider debounce timer
+        self._brightness_timeout_id = None
 
         # Connect mode change callback
         self.mode_manager.set_mode_changed_callback(self._on_mode_changed)
@@ -344,20 +347,22 @@ class MainWindow(Adw.ApplicationWindow):
         self.video_controls.append(self.sync_button)
         control_box.append(self.video_controls)
         
-        # Reading mode controls (presets + color picker + brightness)
-        self.reading_controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=20)
-        self.reading_controls.add_css_class("reading-controls")
+        # Reading mode controls container
+        self.reading_controls = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        
+        # Quick Presets card
+        presets_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=12)
+        presets_card.add_css_class("reading-controls")
         
         # Preset colors section
         presets_title = Gtk.Label(label="Quick Presets")
         presets_title.add_css_class("reading-label")
         presets_title.set_halign(Gtk.Align.START)
-        self.reading_controls.append(presets_title)
+        presets_card.append(presets_title)
         
         # Preset color buttons row
         presets_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=8)
         presets_box.set_halign(Gtk.Align.CENTER)
-        presets_box.set_margin_bottom(8)
         
         # Define preset colors: (name, hex_color, tooltip)
         self._reading_presets = [
@@ -400,12 +405,22 @@ class MainWindow(Adw.ApplicationWindow):
             presets_box.append(btn)
             self._preset_buttons[preset_id] = btn
         
-        self.reading_controls.append(presets_box)
+        presets_card.append(presets_box)
+        self.reading_controls.append(presets_card)
+        
+        # Custom Settings card
+        custom_card = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=16)
+        custom_card.add_css_class("reading-controls")
+        
+        # Custom Settings title
+        custom_title = Gtk.Label(label="Custom Settings")
+        custom_title.add_css_class("reading-label")
+        custom_title.set_halign(Gtk.Align.START)
+        custom_card.append(custom_title)
         
         # Custom color and brightness in one row
         controls_row = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=24)
         controls_row.set_halign(Gtk.Align.CENTER)
-        controls_row.set_margin_top(8)
         
         # Custom color
         color_box = Gtk.Box(orientation=Gtk.Orientation.HORIZONTAL, spacing=12)
@@ -446,18 +461,11 @@ class MainWindow(Adw.ApplicationWindow):
         brightness_box.append(self.brightness_scale)
         controls_row.append(brightness_box)
         
-        self.reading_controls.append(controls_row)
+        custom_card.append(controls_row)
         
-        # Apply button for reading mode
-        self.apply_reading_btn = Gtk.Button()
-        self.apply_reading_btn.set_label("Apply Lighting")
-        self.apply_reading_btn.add_css_class("suggested-action")
-        self.apply_reading_btn.add_css_class("pill")
-        self.apply_reading_btn.set_size_request(160, 44)
-        self.apply_reading_btn.set_halign(Gtk.Align.CENTER)
-        self.apply_reading_btn.set_margin_top(8)
-        self.apply_reading_btn.connect("clicked", self._on_apply_reading)
-        self.reading_controls.append(self.apply_reading_btn)
+
+        
+        self.reading_controls.append(custom_card)
         
         self.reading_controls.set_visible(False)
         control_box.append(self.reading_controls)
@@ -561,15 +569,22 @@ class MainWindow(Adw.ApplicationWindow):
                 self._update_status_card("connected")
 
     def _on_color_changed(self, button, param):
-        """Handle color picker change."""
-        # Color is applied when user clicks Apply button
-        pass
+        """Handle color picker change - auto-apply."""
+        self._apply_reading_settings()
 
     def _on_brightness_changed(self, scale):
-        """Handle brightness slider change."""
-        # Update the value label
+        """Handle brightness slider change - debounced auto-apply."""
+        # Update the value label immediately for visual feedback
         if hasattr(self, 'brightness_value_label'):
             self.brightness_value_label.set_text(str(int(scale.get_value())))
+        
+        # Debounce: cancel existing timer and start new one
+        if self._brightness_timeout_id:
+            GLib.source_remove(self._brightness_timeout_id)
+            self._brightness_timeout_id = None
+        
+        # Schedule apply after 150ms of no changes (user released slider)
+        self._brightness_timeout_id = GLib.timeout_add(150, self._on_brightness_change_done)
     
     def _on_preset_clicked(self, button, preset_id: str, hex_color: str):
         """Handle preset color button click."""
@@ -586,7 +601,7 @@ class MainWindow(Adw.ApplicationWindow):
         button.add_css_class("reading-preset-active")
         
         # Auto-apply the preset
-        self._on_apply_reading(button)
+        self._apply_reading_settings()
     
     def _xy_to_rgb(self, x: float, y: float) -> tuple:
         """Convert CIE XY to approximate RGB for color picker initialization.
@@ -625,8 +640,14 @@ class MainWindow(Adw.ApplicationWindow):
         
         return (int(r * 255), int(g * 255), int(b * 255))
 
-    def _on_apply_reading(self, button):
-        """Apply reading mode settings."""
+    def _on_brightness_change_done(self):
+        """Called when brightness slider change is complete (debounced)."""
+        self._brightness_timeout_id = None
+        self._apply_reading_settings()
+        return False  # Don't repeat
+    
+    def _apply_reading_settings(self):
+        """Apply reading mode settings automatically when changed."""
         rgba = self.color_btn.get_rgba()
         brightness = int(self.brightness_scale.get_value())
         
@@ -878,6 +899,11 @@ class MainWindow(Adw.ApplicationWindow):
         if self.status_timeout_id:
             GLib.source_remove(self.status_timeout_id)
             self.status_timeout_id = None
+        
+        # Clean up brightness debounce timer
+        if self._brightness_timeout_id:
+            GLib.source_remove(self._brightness_timeout_id)
+            self._brightness_timeout_id = None
         
         # Clean up tray icon
         if self._tray_icon:

@@ -64,6 +64,7 @@ class ReadingModeSettings:
     color_xy: tuple = field(default_factory=lambda: (0.5, 0.4))  # Warm white default
     brightness: int = 150  # 0-254
     auto_activate: bool = True  # Auto-switch to reading mode when video sync stops
+    auto_activate_on_startup: bool = False  # Auto-switch to reading mode when app starts
     light_ids: List[str] = field(default_factory=list)  # Explicit light IDs for reading mode (empty = auto)
 
 
@@ -275,6 +276,11 @@ class SettingsManager:
             self._settings.reading_mode.auto_activate = bool(self._settings.reading_mode.auto_activate)
         except Exception:
             self._settings.reading_mode.auto_activate = True
+        
+        try:
+            self._settings.reading_mode.auto_activate_on_startup = bool(self._settings.reading_mode.auto_activate_on_startup)
+        except Exception:
+            self._settings.reading_mode.auto_activate_on_startup = False
         
         # Validate light_ids is a list
         try:

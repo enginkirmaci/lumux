@@ -51,6 +51,22 @@ class LumuxApp(Adw.Application):
     def _on_quit(self, action, param):
         """Quit the application."""
         self.quit()
+    
+    def _auto_activate_reading_mode(self):
+        """Auto-activate reading mode after startup delay.
+        
+        Returns False to stop the GLib timeout.
+        """
+        try:
+            if self.app_context and self.app_context.mode_manager:
+                result = self.app_context.mode_manager.switch_to_reading()
+                if result:
+                    print("Reading mode auto-activated on startup")
+                else:
+                    print("Failed to auto-activate reading mode")
+        except Exception as e:
+            print(f"Error auto-activating reading mode: {e}")
+        return False  # Stop the timeout
 
     def on_activate(self, app):
         """Initialize and show main window."""
@@ -78,6 +94,12 @@ class LumuxApp(Adw.Application):
 
         self.main_window = MainWindow(self, self.app_context)
         self.main_window.present()
+        
+        # Auto-activate reading mode on startup if enabled
+        if (bridge_status.connected and 
+            settings.reading_mode.auto_activate_on_startup):
+            print("Auto-activating reading mode on startup...")
+            GLib.timeout_add(500, self._auto_activate_reading_mode)
     
     def _setup_app_icon(self):
         """Set up the application icon."""

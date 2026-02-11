@@ -24,5 +24,18 @@
   "ui": {
     "start_at_startup": false,
     "minimize_to_tray_on_sync": false
+  },
+  "black_bar": {
+    "enabled": false,
+    "threshold": 10,
+    "detection_rate": 30,
+    "smooth_factor": 0.3
+  },
+  "reading_mode": {
+    "color_xy": [0.5, 0.4],
+    "brightness": 150,
+    "auto_activate": true,
+    "auto_activate_on_startup": false,
+    "light_ids": []
   }
 }

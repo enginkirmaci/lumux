@@ -327,12 +327,19 @@ class SettingsDialog(Adw.PreferencesDialog):
         self.reading_brightness_row.set_value(self.settings.reading_mode.brightness)
         reading_group.add(self.reading_brightness_row)
 
-        # Auto-activate reading mode
+        # Auto-activate reading mode on stop
         self.reading_auto_row = Adw.SwitchRow()
         self.reading_auto_row.set_title("Auto-activate on Stop")
         self.reading_auto_row.set_subtitle("Automatically switch to reading mode when video sync stops")
         self.reading_auto_row.set_active(self.settings.reading_mode.auto_activate)
         reading_group.add(self.reading_auto_row)
+
+        # Auto-activate reading mode on startup
+        self.reading_auto_startup_row = Adw.SwitchRow()
+        self.reading_auto_startup_row.set_title("Auto-activate on Startup")
+        self.reading_auto_startup_row.set_subtitle("Automatically switch to reading mode when app starts")
+        self.reading_auto_startup_row.set_active(self.settings.reading_mode.auto_activate_on_startup)
+        reading_group.add(self.reading_auto_startup_row)
 
         # Connect close signal to save settings
         self.connect("closed", self._on_closed)
@@ -626,5 +633,6 @@ class SettingsDialog(Adw.PreferencesDialog):
         self.settings.reading_mode.color_xy = xy
         self.settings.reading_mode.brightness = int(self.reading_brightness_row.get_value())
         self.settings.reading_mode.auto_activate = bool(self.reading_auto_row.get_active())
+        self.settings.reading_mode.auto_activate_on_startup = bool(self.reading_auto_startup_row.get_active())
         
         self.settings.save()

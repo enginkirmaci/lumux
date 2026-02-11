@@ -301,8 +301,6 @@ class SettingsManager:
         """Enable autostart by writing .desktop file."""
 
         autostart_dir = Path.home() / '.config' / 'autostart'
-        autostart_dir.mkdir(parents=True, exist_ok=True)
-
         desktop_path = autostart_dir / 'io.github.enginkirmaci.lumux.desktop'
 
         if is_running_in_flatpak():
@@ -329,11 +327,16 @@ NoDisplay=false
 """
 
         try:
+            autostart_dir.mkdir(parents=True, exist_ok=True)
             with open(desktop_path, 'w') as f:
                 f.write(content)
+            
+            # Verify the file was actually written (catches sandboxed Flatpak case)
+            if not desktop_path.exists():
+                raise PermissionError("File was not created. Flatpak may need filesystem=host permission.")
+            
             return True
         except PermissionError:
-            # Flatpak without host filesystem access
             raise PermissionError("Cannot write to autostart directory. Flatpak needs filesystem=host permission.")
         except Exception as e:
             print(f"Failed to write autostart file: {e}")

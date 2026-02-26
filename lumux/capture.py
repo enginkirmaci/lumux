@@ -28,6 +28,7 @@ class ScreenCapture:
         # Portal state
         self._portal_node_id: Optional[int] = None
         self._portal_session_handle: Optional[str] = None
+        self._portal_bus = None
         
         # GStreamer pipeline for high-performance capture
         self._pipeline: Optional[Gst.Pipeline] = None
@@ -146,6 +147,7 @@ class ScreenCapture:
             
             print("Requesting screen capture permission via portal...")
             bus = pydbus.SessionBus()
+            self._portal_bus = bus
             portal = bus.get("org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop")
             screencast = portal["org.freedesktop.portal.ScreenCast"]
             
@@ -287,8 +289,23 @@ class ScreenCapture:
             print(f"Error processing frame: {e}")
             return Gst.FlowReturn.OK
 
+    def _close_portal_session(self):
+        """Close the XDG Desktop Portal session to fully release screen casting."""
+        if self._portal_session_handle and self._portal_bus:
+            try:
+                session = self._portal_bus.get(
+                    "org.freedesktop.portal.Desktop",
+                    self._portal_session_handle
+                )
+                session.Close()
+                print("Portal session closed")
+            except Exception as e:
+                print(f"Error closing portal session (may already be closed): {e}")
+        self._portal_session_handle = None
+        self._portal_bus = None
+
     def stop_pipeline(self):
-        """Stop the GStreamer pipeline."""
+        """Stop the GStreamer pipeline and release the portal session."""
         if self._pipeline:
             self._pipeline.set_state(Gst.State.NULL)
             self._pipeline = None
@@ -296,8 +313,8 @@ class ScreenCapture:
             self._pipeline_running = False
             self._latest_frame = None
             self._portal_node_id = None
-            self._portal_session_handle = None
             print("GStreamer pipeline stopped")
+        self._close_portal_session()
 
     def __del__(self):
         """Cleanup on destruction."""

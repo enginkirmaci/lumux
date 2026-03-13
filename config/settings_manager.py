@@ -27,6 +27,7 @@ class HueSettings:
 @dataclass
 class CaptureSettings:
     scale_factor: float = 0.125
+    source_type: str = "screen"  # "screen" = monitor, "window" = single window
 
 
 @dataclass
@@ -202,6 +203,8 @@ class SettingsManager:
     def _validate_settings(self):
         """Validate and clamp settings to valid ranges."""
         self._settings.capture.scale_factor = max(0.01, min(1.0, self._settings.capture.scale_factor))
+        if self._settings.capture.source_type not in ("screen", "window"):
+            self._settings.capture.source_type = "screen"
         self._settings.sync.fps = max(1, min(60, self._settings.sync.fps))
         self._settings.sync.transition_time_ms = max(0, min(1000, self._settings.sync.transition_time_ms))
         self._settings.sync.brightness_scale = max(0.0, min(2.0, self._settings.sync.brightness_scale))

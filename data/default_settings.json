@@ -7,7 +7,8 @@
     "auto_discover": true
   },
   "capture": {
-    "scale_factor": 0.125
+    "scale_factor": 0.125,
+    "source_type": "screen"
   },
   "zones": {
     "show_preview": true,

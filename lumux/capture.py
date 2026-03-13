@@ -21,8 +21,14 @@ Gst.init(None)
 
 
 class ScreenCapture:
-    def __init__(self, scale_factor: float = 0.125, black_bar_settings: Optional["BlackBarSettings"] = None):
+    def __init__(
+        self,
+        scale_factor: float = 0.125,
+        black_bar_settings: Optional["BlackBarSettings"] = None,
+        source_type: str = "screen",
+    ):
         self.scale_factor = scale_factor
+        self.source_type = source_type  # "screen" = monitor, "window" = single window
         self._display = None
         
         # Portal state
@@ -145,7 +151,8 @@ class ScreenCapture:
         try:
             import pydbus
             
-            print("Requesting screen capture permission via portal...")
+            kind = "window" if self.source_type == "window" else "screen"
+            print(f"Requesting {kind} capture permission via portal...")
             bus = pydbus.SessionBus()
             self._portal_bus = bus
             portal = bus.get("org.freedesktop.portal.Desktop", "/org/freedesktop/portal/desktop")
@@ -184,10 +191,11 @@ class ScreenCapture:
                 return False
             self._portal_session_handle = state["session_handle"]
 
-            # 2. SelectSources
+            # 2. SelectSources (1 = Monitor, 2 = Window per XDG ScreenCast spec)
+            portal_types = 1 if self.source_type == "screen" else 2
             loop = GLib.MainLoop()
             req = screencast.SelectSources(self._portal_session_handle, {
-                "types": GLib.Variant("u", 1),  # Monitor
+                "types": GLib.Variant("u", portal_types),
                 "multiple": GLib.Variant("b", False)
             })
             sub = bus.con.signal_subscribe(None, "org.freedesktop.portal.Request", "Response", req, None, 0, on_response)

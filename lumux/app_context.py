@@ -30,6 +30,7 @@ class AppContext:
         self.capture = ScreenCapture(
             scale_factor=settings.capture.scale_factor,
             black_bar_settings=settings.black_bar,
+            source_type=settings.capture.source_type,
         )
         self.zone_processor = ZoneProcessor(settings=settings.zones)
         self.color_analyzer = ColorAnalyzer(
@@ -115,6 +116,7 @@ class AppContext:
 
         capture = self.settings.capture
         self.capture.scale_factor = capture.scale_factor
+        self.capture.source_type = capture.source_type
 
         # Update black bar detector settings
         self.capture.update_black_bar_settings(self.settings.black_bar)

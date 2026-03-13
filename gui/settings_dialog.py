@@ -160,6 +160,15 @@ class SettingsDialog(Adw.PreferencesDialog):
         capture_group.set_description("Configure how the screen is captured")
         capture_page.add(capture_group)
 
+        # Capture source: entire screen or single window
+        self.capture_source_row = Adw.ComboRow()
+        self.capture_source_row.set_title("Capture Source")
+        self.capture_source_row.set_subtitle("What to capture for ambient lighting")
+        source_model = Gtk.StringList.new(["Entire screen", "Single window"])
+        self.capture_source_row.set_model(source_model)
+        self.capture_source_row.set_selected(0 if self.settings.capture.source_type == "screen" else 1)
+        capture_group.add(self.capture_source_row)
+
         # Resolution scale
         self.scale_row = Adw.SpinRow.new_with_range(0.01, 1.0, 0.01)
         self.scale_row.set_title("Resolution Scale")
@@ -580,6 +589,7 @@ class SettingsDialog(Adw.PreferencesDialog):
         else:
             self.settings.hue.entertainment_config_id = ""
         
+        self.settings.capture.source_type = "window" if self.capture_source_row.get_selected() == 1 else "screen"
         self.settings.capture.scale_factor = self.scale_row.get_value()
         
         # Black bar settings

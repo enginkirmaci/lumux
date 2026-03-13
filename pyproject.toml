@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lumux"
-version = "0.4.0"
+version = "0.4.2"
 description = "Philips Hue Sync for Linux on Wayland"
 readme = "README.md"
 license = {text = "MIT"}

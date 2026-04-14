@@ -1,6 +1,7 @@
 """Main application entry point for Lumux."""
 
 import os
+import signal
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
@@ -20,6 +21,16 @@ class LumuxApp(Adw.Application):
         self.connect('activate', self.on_activate)
         self.main_window = None
         self._setup_actions()
+        
+        # Register signal handlers for clean shutdown
+        # Ensures Hue lights are turned off when system sends SIGTERM/SIGINT
+        signal.signal(signal.SIGTERM, self._handle_signal)
+        signal.signal(signal.SIGINT, self._handle_signal)
+    
+    def _handle_signal(self, signum, frame):
+        """Handle SIGTERM/SIGINT by triggering clean shutdown."""
+        print(f"Received signal {signum}, shutting down...")
+        GLib.idle_add(self._quit_safely)
     
     def _setup_actions(self):
         """Setup application actions for tray menu."""
@@ -53,6 +64,13 @@ class LumuxApp(Adw.Application):
         if self.main_window:
             self.main_window._quitting = True
         self.quit()
+    
+    def _quit_safely(self):
+        """Safely quit from signal handler (called on GLib idle)."""
+        if self.main_window:
+            self.main_window._quitting = True
+        self.quit()
+        return False  # Don't repeat
     
     def _auto_activate_reading_mode(self):
         """Auto-activate reading mode after startup delay.

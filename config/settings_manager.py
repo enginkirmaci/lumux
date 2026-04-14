@@ -305,11 +305,19 @@ class SettingsManager:
         """Enable autostart by creating .desktop file in autostart directory."""
         return self._enable_autostart_file()
     
+    def _get_autostart_path(self) -> Path:
+        """Get the autostart .desktop file path, respecting Flatpak sandbox."""
+        if is_running_in_flatpak():
+            xdg_config = os.environ.get('XDG_CONFIG_HOME', '')
+            if xdg_config:
+                return Path(xdg_config) / 'autostart' / 'io.github.enginkirmaci.lumux.desktop'
+        return Path.home() / '.config' / 'autostart' / 'io.github.enginkirmaci.lumux.desktop'
+
     def _enable_autostart_file(self) -> bool:
         """Enable autostart by writing .desktop file."""
 
-        autostart_dir = Path.home() / '.config' / 'autostart'
-        desktop_path = autostart_dir / 'io.github.enginkirmaci.lumux.desktop'
+        desktop_path = self._get_autostart_path()
+        autostart_dir = desktop_path.parent
 
         if is_running_in_flatpak():
             exec_cmd = "flatpak run io.github.enginkirmaci.lumux"
@@ -356,7 +364,7 @@ NoDisplay=false
     
     def _disable_autostart_file(self) -> bool:
         """Disable autostart by removing .desktop file."""
-        desktop_path = Path.home() / '.config' / 'autostart' / 'io.github.enginkirmaci.lumux.desktop'
+        desktop_path = self._get_autostart_path()
         try:
             if desktop_path.exists():
                 desktop_path.unlink()
@@ -367,8 +375,7 @@ NoDisplay=false
 
     def is_autostart_enabled(self) -> bool:
         """Check if autostart is enabled by looking for .desktop file."""
-        desktop_path = Path.home() / '.config' / 'autostart' / 'io.github.enginkirmaci.lumux.desktop'
-        return desktop_path.exists()
+        return self._get_autostart_path().exists()
 
     def get_autostart_status(self) -> tuple[bool, str]:
         """Get autostart status and a message explaining the current state.

@@ -95,9 +95,9 @@ class AppContext:
             self.entertainment_stream.disconnect(self.bridge)
 
     def shutdown(self) -> None:
-        """Stop background workers and any running sync."""
+        """Stop background workers and any running sync, turning off lights."""
         if hasattr(self, 'mode_manager'):
-            self.mode_manager.turn_off(turn_off_lights=False)
+            self.mode_manager.turn_off(turn_off_lights=True)
         else:
             # Fallback to manual cleanup
             try:

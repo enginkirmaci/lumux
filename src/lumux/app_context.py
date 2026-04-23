@@ -3,7 +3,7 @@
 import threading
 from dataclasses import dataclass
 
-from config.settings_manager import SettingsManager
+from lumux.config.settings_manager import SettingsManager
 from lumux.hue_bridge import HueBridge
 from lumux.capture import ScreenCapture
 from lumux.colors import ColorAnalyzer

@@ -4,7 +4,7 @@ import json
 from dataclasses import dataclass, asdict, field
 from pathlib import Path
 from typing import Optional, List
-from config.zone_mapping import ZoneMapping
+from lumux.config.zone_mapping import ZoneMapping
 import sys
 import os
 import shlex

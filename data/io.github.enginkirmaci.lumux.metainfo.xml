@@ -44,27 +44,27 @@
 
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/main/screenshots/screenshot1.png</image>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/main/assets/screenshots/screenshot1.png</image>
       <caption>Main application window with zone preview</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/main/screenshots/screenshot2.png</image>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/main/assets/screenshots/screenshot2.png</image>
       <caption>Bridge configuration</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/main/screenshots/screenshot3.png</image>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/main/assets/screenshots/screenshot3.png</image>
       <caption>General configuration</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/main/screenshots/screenshot4.png</image>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/main/assets/screenshots/screenshot4.png</image>
       <caption>Capture configuration</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/main/screenshots/screenshot5.png</image>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/main/assets/screenshots/screenshot5.png</image>
       <caption>Zones configuration</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/main/screenshots/screenshot6.png</image>
+      <image>https://raw.githubusercontent.com/enginkirmaci/lumux/main/assets/screenshots/screenshot6.png</image>
       <caption>Sync configuration</caption>
     </screenshot>
   </screenshots>
@@ -77,6 +77,20 @@
   </branding>
 
   <releases>
+    <release version="0.6.0" date="2026-04-23">
+      <description>
+        <p>Performance and refactoring:</p>
+        <ul>
+          <li>Migrated image processing pipeline from PIL to numpy arrays for better memory efficiency</li>
+          <li>Added dynamic scale factor with automatic pipeline restart support</li>
+          <li>Pre-computed message buffers and encoded config ID at init for faster entertainment streaming</li>
+          <li>Converted bridge status checks to async with thread safety for settings application</li>
+          <li>Added bidirectional RGB/XY color conversion and migrated utils into the lumux package</li>
+          <li>Optimized zone preview to skip redraws when colors haven't changed</li>
+          <li>Tuned default sync performance: increased FPS to 30, reduced transition time to 50ms</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.5.0" date="2026-04-15">
       <description>
         <p>Bug fixes and improvements:</p>

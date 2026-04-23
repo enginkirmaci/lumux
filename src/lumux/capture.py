@@ -15,7 +15,7 @@ from gi.repository import GLib, Gst, GstApp
 from lumux.black_bar_detector import BlackBarDetector, CropRegion
 
 if TYPE_CHECKING:
-    from config.settings_manager import BlackBarSettings
+    from lumux.config.settings_manager import BlackBarSettings
 
 Gst.init(None)
 

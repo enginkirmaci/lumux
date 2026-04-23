@@ -40,7 +40,7 @@ modules:
       - pip3 install --no-deps --no-build-isolation --prefix=/app .
       - install -Dm644 data/io.github.enginkirmaci.lumux.desktop /app/share/applications/io.github.enginkirmaci.lumux.desktop
       - install -Dm644 data/io.github.enginkirmaci.lumux.metainfo.xml /app/share/metainfo/io.github.enginkirmaci.lumux.metainfo.xml
-      - install -Dm644 io.github.enginkirmaci.lumux.svg /app/share/icons/hicolor/scalable/apps/io.github.enginkirmaci.lumux.svg
+      - install -Dm644 flatpak/io.github.enginkirmaci.lumux.svg /app/share/icons/hicolor/scalable/apps/io.github.enginkirmaci.lumux.svg
     sources:
       - type: dir
-        path: .
+        path: ..

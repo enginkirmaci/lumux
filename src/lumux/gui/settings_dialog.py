@@ -8,7 +8,7 @@ from gi.repository import Gtk, Adw, Gdk
 from lumux.hue_bridge import HueBridge
 from lumux.app_context import AppContext
 from lumux.utils.rgb_xy_converter import xy_to_rgb, rgb_to_xy
-from gui.bridge_wizard import BridgeWizard
+from lumux.gui.bridge_wizard import BridgeWizard
 
 
 class SettingsDialog(Adw.PreferencesDialog):

@@ -9,14 +9,14 @@ from gi.repository import Gtk, GLib, Adw, Gdk, Gio
 from lumux.app_context import AppContext
 from lumux.mode_manager import Mode
 from lumux.utils.rgb_xy_converter import xy_to_rgb, rgb_to_xy
-from gui.settings_dialog import SettingsDialog
-from gui.zone_preview_widget import ZonePreviewWidget
-from gui.tray_icon import TrayIcon
+from lumux.gui.settings_dialog import SettingsDialog
+from lumux.gui.zone_preview_widget import ZonePreviewWidget
+from lumux.gui.tray_icon import TrayIcon
 
-# App icon path
+# App icon path — icon is in flatpak/ directory at project root
 APP_ICON_PATH = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.abspath(__file__))),
-    "io.github.enginkirmaci.lumux.svg",
+    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+    "flatpak", "io.github.enginkirmaci.lumux.svg",
 )
 
 

@@ -18,7 +18,7 @@ try:
 except ImportError:
     HAS_GLIB = False
 
-from config.settings_manager import ReadingModeSettings
+from lumux.config.settings_manager import ReadingModeSettings
 from lumux.hue_bridge import HueBridge
 from lumux.sync import SyncController
 from lumux.entertainment import EntertainmentStream

@@ -21,47 +21,11 @@
             ]
         },
         {
-            "name": "python3-meson-python",
-            "buildsystem": "simple",
-            "cleanup": [
-                "*"
-            ],
-            "build-commands": [
-                "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"meson-python\" --no-build-isolation"
-            ],
-            "sources": [
-                {
-                    "type": "file",
-                    "url": "https://files.pythonhosted.org/packages/16/7f/d1b0c65b267a1463d752b324f11d3470e30889daefc4b9ec83029bfa30b5/meson_python-0.19.0-py3-none-any.whl",
-                    "sha256": "67b5906c37404396d23c195e12c8825506074460d4a2e7083266b845d14f0298"
-                },
-                {
-                    "type": "file",
-                    "url": "https://files.pythonhosted.org/packages/1d/0b/da4851b1e2d9c40c9bd74c0abd94510a7d797da9ccde0a90e8953751ed4a/pyproject_metadata-0.11.0-py3-none-any.whl",
-                    "sha256": "85bbecca8694e2c00f63b492c96921d6c228454057c88e7c352b2077fcaa4096"
-                }
-            ]
-        },
-        {
-            "name": "python3-pybind11",
-            "buildsystem": "simple",
-            "cleanup": [
-                "*"
-            ],
-            "build-commands": [
-                "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"pybind11\" --no-build-isolation"
-            ],
-            "sources": [
-                {
-                    "type": "file",
-                    "url": "https://files.pythonhosted.org/packages/ab/87/99f21e9b20899d6dc1bf7544cfe53e5fa17acc21bb267971a540425357d3/pybind11-3.0.3-py3-none-any.whl",
-                    "sha256": "fb5f8e4a64946b4dcc0451c83a8c384f803bc0a62dd1ba02f199e97dbc9aad4c"
-                }
-            ]
-        },
-        {
             "name": "python3-zeroconf",
             "buildsystem": "simple",
+            "cleanup": [
+                "*"
+            ],
             "build-commands": [
                 "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"zeroconf>=0.60.0\" --no-build-isolation"
             ],
@@ -75,6 +39,91 @@
                     "type": "file",
                     "url": "https://files.pythonhosted.org/packages/67/46/10db987799629d01930176ae523f70879b63577060d63e05ebf9214aba4b/zeroconf-0.148.0.tar.gz",
                     "sha256": "03fcca123df3652e23d945112d683d2f605f313637611b7d4adf31056f681702"
+                }
+            ]
+        },
+        {
+            "name": "python3-pybind11",
+            "buildsystem": "simple",
+            "cleanup": [
+                "*"
+            ],
+            "build-commands": [
+                "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"pybind11>=2.12.0\" --no-build-isolation"
+            ],
+            "sources": [
+                {
+                    "type": "file",
+                    "url": "https://files.pythonhosted.org/packages/b3/06/c3a23c9a0263b136c519f033a58d4641e73065fefc7754e9667ec206d992/pybind11-3.0.4-py3-none-any.whl",
+                    "sha256": "961720ee652da51d531b7b2451a6bd2bc042b0106e6d9baa48ecb7d58034ce63"
+                }
+            ]
+        },
+        {
+            "name": "python3-PyGObject",
+            "buildsystem": "simple",
+            "cleanup": [
+                "*"
+            ],
+            "build-commands": [
+                "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"PyGObject>=3.42.0\" --no-build-isolation"
+            ],
+            "sources": [
+                {
+                    "type": "file",
+                    "url": "https://files.pythonhosted.org/packages/22/d9/1728840a22a4ef8a8f479b9156aa2943cd98c3907accd3849fb0d5f82bfd/pycairo-1.29.0.tar.gz",
+                    "sha256": "f3f7fde97325cae80224c09f12564ef58d0d0f655da0e3b040f5807bd5bd3142"
+                },
+                {
+                    "type": "file",
+                    "url": "https://files.pythonhosted.org/packages/a2/80/09247a2be28af2c2240132a0af6c1005a2b1d089242b13a2cd782d2de8d7/pygobject-3.56.2.tar.gz",
+                    "sha256": "b816098969544081de9eecedb94ad6ac59c77e4d571fe7051f18bebcec074313"
+                }
+            ]
+        },
+        {
+            "name": "python3-build-backends",
+            "buildsystem": "simple",
+            "cleanup": [
+                "*"
+            ],
+            "build-commands": [
+                "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"meson-python\" \"pyproject-metadata\" \"packaging\" \"Cython\" --no-build-isolation"
+            ],
+            "sources": [
+                {
+                    "type": "file",
+                    "url": "https://files.pythonhosted.org/packages/16/7f/d1b0c65b267a1463d752b324f11d3470e30889daefc4b9ec83029bfa30b5/meson_python-0.19.0-py3-none-any.whl",
+                    "sha256": "67b5906c37404396d23c195e12c8825506074460d4a2e7083266b845d14f0298"
+                },
+                {
+                    "type": "file",
+                    "url": "https://files.pythonhosted.org/packages/1d/0b/da4851b1e2d9c40c9bd74c0abd94510a7d797da9ccde0a90e8953751ed4a/pyproject_metadata-0.11.0-py3-none-any.whl",
+                    "sha256": "85bbecca8694e2c00f63b492c96921d6c228454057c88e7c352b2077fcaa4096"
+                },
+                {
+                    "type": "file",
+                    "url": "https://files.pythonhosted.org/packages/7a/c2/920ef838e2f0028c8262f16101ec09ebd5969864e5a64c4c05fad0617c56/packaging-26.1-py3-none-any.whl",
+                    "sha256": "5d9c0669c6285e491e0ced2eee587eaf67b670d94a19e94e3984a481aba6802f"
+                },
+                {
+                    "type": "file",
+                    "url": "https://files.pythonhosted.org/packages/ff/fa/d3c15189f7c52aaefbaea76fb012119b04b9013f4bf446cb4eb4c26c4e6b/cython-3.2.4-py3-none-any.whl",
+                    "sha256": "732fc93bc33ae4b14f6afaca663b916c2fdd5dcbfad7114e17fb2434eeaea45c"
+                }
+            ]
+        },
+        {
+            "name": "python3-urllib3",
+            "buildsystem": "simple",
+            "build-commands": [
+                "pip3 install --verbose --exists-action=i --no-index --find-links=\"file://${PWD}\" --prefix=${FLATPAK_DEST} \"urllib3>=1.26.0\" --no-build-isolation"
+            ],
+            "sources": [
+                {
+                    "type": "file",
+                    "url": "https://files.pythonhosted.org/packages/39/08/aaaad47bc4e9dc8c725e68f9d04865dbcb2052843ff09c97b08904852d84/urllib3-2.6.3-py3-none-any.whl",
+                    "sha256": "bf272323e553dfb2e87d9bfd225ca7b0f467b919d7bbd355436d3fd37cb0acd4"
                 }
             ]
         },
@@ -115,8 +164,8 @@
             "sources": [
                 {
                     "type": "file",
-                    "url": "https://files.pythonhosted.org/packages/9a/3c/c17fb3ca2d9c3acff52e30b309f538586f9f5b9c9cf454f3845fc9af4881/certifi-2026.2.25-py3-none-any.whl",
-                    "sha256": "027692e4402ad994f1c42e52a4997a9763c646b73e4096e4d5d6db8af1d6f0fa"
+                    "url": "https://files.pythonhosted.org/packages/22/30/7cd8fdcdfbc5b869528b079bfb76dcdf6056b1a2097a662e5e8c04f42965/certifi-2026.4.22-py3-none-any.whl",
+                    "sha256": "3cb2210c8f88ba2318d29b0388d1023c8492ff72ecdde4ebdaddbb13a31b1c4a"
                 },
                 {
                     "type": "file",
@@ -125,8 +174,8 @@
                 },
                 {
                     "type": "file",
-                    "url": "https://files.pythonhosted.org/packages/0e/61/66938bbb5fc52dbdf84594873d5b51fb1f7c7794e9c0f5bd885f30bc507b/idna-3.11-py3-none-any.whl",
-                    "sha256": "771a87f49d9defaf64091e6e6fe9c18d4833f140bd19464795bc32d966ca37ea"
+                    "url": "https://files.pythonhosted.org/packages/5d/13/ad7d7ca3808a898b4612b6fe93cde56b53f3034dcde235acb1f0e1df24c6/idna-3.13-py3-none-any.whl",
+                    "sha256": "892ea0cde124a99ce773decba204c5552b69c3c67ffd5f232eb7696135bc8bb3"
                 },
                 {
                     "type": "file",

@@ -11,7 +11,7 @@ from lumux.capture import ScreenCapture
 from lumux.zones import ZoneProcessor
 from lumux.colors import ColorAnalyzer
 from lumux.entertainment import EntertainmentStream
-from config.zone_mapping import ZoneMapping
+from lumux.config.zone_mapping import ZoneMapping
 
 
 class SyncController:

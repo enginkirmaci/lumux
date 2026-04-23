@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "lumux"
-version = "0.5.0"
-description = "Philips Hue Sync for Linux on Wayland"
+version = "0.6.0"
+description = "Philips Hue Sync application for Linux on Wayland"
 readme = "README.md"
 license = {text = "MIT"}
 authors = [
@@ -24,30 +24,46 @@ classifiers = [
     "Topic :: Desktop Environment",
 ]
 dependencies = [
+    "zeroconf>=0.60.0",
+    "PyGObject>=3.42.0",
+    "urllib3>=1.26.0",
     "numpy>=1.24.0",
     "Pillow>=10.0.0",
     "requests>=2.28.0",
-    "urllib3>=1.26.0",
-    "pydbus>=0.6.0",
-    "zeroconf>=0.60.0",
+    "pydbus>=0.6.0"
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "ruff>=0.1.0",
 ]
 
 [project.scripts]
-lumux = "main:main"
+lumux = "lumux.__main__:main"
 
 [project.urls]
 Homepage = "https://github.com/enginkirmaci/lumux"
 Issues = "https://github.com/enginkirmaci/lumux/issues"
 
-[tool.setuptools.packages.find]
-where = ["."]
-include = ["lumux*", "gui*", "config*"]
-
+# --- src layout: find packages under src/ ---
 [tool.setuptools]
-py-modules = ["main"]
+py-modules = []   # No root-level modules
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.setuptools.data-files]
 "share/lumux/data" = ["data/default_settings.json"]
 "share/applications" = ["data/io.github.enginkirmaci.lumux.desktop"]
 "share/metainfo" = ["data/io.github.enginkirmaci.lumux.metainfo.xml"]
-"share/icons/hicolor/scalable/apps" = ["io.github.enginkirmaci.lumux.svg"]
+"share/icons/hicolor/scalable/apps" = ["flatpak/io.github.enginkirmaci.lumux.svg"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 88

@@ -61,14 +61,19 @@ zones.json
 .DS_Store
 Thumbs.db
 
+# Ruff linter
+.ruff_cache/
+
+# Flatpak build
+flatpak/build/
+flatpak/.flatpak-builder/
+
 # Test outputs & logs
 *.log
 *.sqlite3
 *.db
-*.mp4
 pip-selfcheck.json
 */__pycache__/*
-config/__pycache__/settings_manager.cpython-314.pyc
-config/__pycache__/zone_mapping.cpython-314.pyc
-Hue CLIP API.html
+*/*.pyc
+*/*/*.pyc
 /docs/*

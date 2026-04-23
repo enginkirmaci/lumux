@@ -7,15 +7,17 @@ import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, Gio, GLib, Gdk
-from config.settings_manager import SettingsManager
-from gui.main_window import MainWindow
+from lumux.config.settings_manager import SettingsManager
+from lumux.gui.main_window import MainWindow
 from lumux.app_context import AppContext
 from lumux.utils.logging import timed_print
 
-# Get the app icon path (relative to this file)
+# Get the app icon path (relative to this file's location in src/lumux/)
+# Icon is at project_root/io.github.enginkirmaci.lumux.svg
 APP_ICON_PATH = os.path.join(
-    os.path.dirname(os.path.abspath(__file__)), "io.github.enginkirmaci.lumux.svg"
+    os.path.dirname(os.path.abspath(__file__)), "..", "..", "io.github.enginkirmaci.lumux.svg"
 )
+APP_ICON_PATH = os.path.normpath(APP_ICON_PATH)
 
 
 class LumuxApp(Adw.Application):

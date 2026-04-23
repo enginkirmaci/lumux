@@ -4,7 +4,7 @@ import numpy as np
 from typing import Dict, Optional, TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from config.settings_manager import ZoneSettings
+    from lumux.config.settings_manager import ZoneSettings
 
 
 class ZoneProcessor:

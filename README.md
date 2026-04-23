@@ -36,14 +36,14 @@ git clone https://github.com/enginkirmaci/lumux.git
 cd lumux
 ```
 
-2. Install dependencies:
+2. Install in editable mode:
 ```bash
-pip install -r requirements.txt
+pip install -e .
 ```
 
 3. Run:
 ```bash
-python main.py
+python -m lumux
 # or, if installed:
 lumux
 ```
@@ -64,12 +64,14 @@ pip install -e .
 
 **Python:**
 - Python 3.10+ recommended
-- Install Python packages from requirements.txt:
-  - python-hue-v2>=0.1.0
+- Dependencies are managed in `pyproject.toml` and installed automatically with `pip install -e .`:
+  - PyGObject>=3.42.0
   - numpy>=1.24.0
   - Pillow>=10.0.0
   - requests>=2.28.0
+  - urllib3>=1.26.0
   - pydbus>=0.6.0
+  - zeroconf>=0.60.0
 
 ## Usage
 
@@ -77,7 +79,7 @@ pip install -e .
 
 1. Start the application:
 ```bash
-python main.py
+python -m lumux
 # or
 lumux
 ```

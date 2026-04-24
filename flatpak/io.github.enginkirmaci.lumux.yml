@@ -15,7 +15,7 @@ finish-args:
   - --share=network
 
   # Screen capture via portals / PipeWire
-  - --filesystem=xdg-run/pipewire-0:ro
+  - --filesystem=xdg-run/pipewire-0
 
   # System tray support via StatusNotifierItem (D-Bus)
   - --talk-name=org.kde.StatusNotifierWatcher

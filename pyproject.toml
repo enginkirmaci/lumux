@@ -24,8 +24,8 @@ classifiers = [
     "Topic :: Desktop Environment",
 ]
 dependencies = [
-    "zeroconf>=0.60.0",
     "PyGObject>=3.42.0",
+    "zeroconf>=0.60.0",
     "urllib3>=1.26.0",
     "numpy>=1.24.0",
     "Pillow>=10.0.0",

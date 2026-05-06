@@ -57,7 +57,6 @@ pip install -e .
 
 **System:**
 - Linux with a Wayland compositor that supports screen-casting portals (xdg-desktop-portal)
-- OpenSSL (system) required if using DTLS / entertainment streaming
 
 **Common packages (example on Fedora):**
 - gtk4, libadwaita, xdg-desktop-portal (install via your distro package manager)

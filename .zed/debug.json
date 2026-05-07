@@ -1,0 +1,31 @@
+// Project-local debug tasks
+//
+// For more documentation on how to configure debug tasks,
+// see: https://zed.dev/docs/debugger
+[
+  // {
+  //   "label": "Python: Module",
+  //   "adapter": "Debugpy",
+  //   "request": "launch",
+  //   "module": "lumux",
+  //   "subProcess": false,
+  //   "redirectOutput": true,
+  //   "justMyCode": false,
+  //   "cwd": "${ZED_WORKTREE_ROOT}",
+  //   "pathMappings": [
+  //     {
+  //       "localRoot": "${ZED_WORKTREE_ROOT}",
+  //       "remoteRoot": ".",
+  //     },
+  //   ],
+  // },
+  {
+    "label": "Python: Module Lumux",
+    "adapter": "Debugpy",
+    "request": "launch",
+    "module": "lumux",
+    "subProcess": false,
+    "redirectOutput": true,
+    "justMyCode": false,
+  },
+]

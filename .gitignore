@@ -34,7 +34,7 @@ venv.bak/
 .mypy_cache/
 
 # IDEs and editors
-.vscode/
+# .vscode/
 .idea/
 *.sublime-project
 *.sublime-workspace

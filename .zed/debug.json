@@ -27,5 +27,6 @@
     "subProcess": false,
     "redirectOutput": true,
     "justMyCode": false,
+    "python": "${ZED_WORKTREE_ROOT}/.venv/bin/python",
   },
 ]

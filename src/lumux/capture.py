@@ -302,10 +302,24 @@ class ScreenCapture:
         has_videoconvert = Gst.ElementFactory.find("videoconvert") is not None
 
         sink_props = "name=sink emit-signals=true drop=true max-buffers=1 sync=false"
-        src = f"pipewiresrc path={node_id} do-timestamp=true"
+        # always-copy=true forces pipewiresrc to copy DMA-BUF into system memory,
+        # avoiding "code not implemented" errors when glupload receives DMA-BUF buffers.
+        src = f"pipewiresrc path={node_id} do-timestamp=true always-copy=true"
 
         if target_w and target_h:
             scaled_caps = f"video/x-raw,format=RGB,width={target_w},height={target_h}"
+
+            if has_videoconvert and has_videoscale:
+                configs.append(
+                    f"{src} ! videoconvert ! videoscale ! {scaled_caps} ! "
+                    f"appsink {sink_props}"
+                )
+
+            if has_v4l2convert and has_videoscale:
+                configs.append(
+                    f"{src} ! v4l2convert ! videoscale ! {scaled_caps} ! "
+                    f"appsink {sink_props}"
+                )
 
             if has_glupload and has_glcolorconvert and has_gldownload:
                 if has_glcolorscale:
@@ -322,17 +336,15 @@ class ScreenCapture:
                         f"{scaled_caps} ! appsink {sink_props}"
                     )
 
-            if has_v4l2convert and has_videoscale:
-                configs.append(
-                    f"{src} ! v4l2convert ! videoscale ! {scaled_caps} ! "
-                    f"appsink {sink_props}"
-                )
+        if has_videoconvert:
+            configs.append(
+                f"{src} ! videoconvert ! video/x-raw,format=RGB ! appsink {sink_props}"
+            )
 
-            if has_videoconvert and has_videoscale:
-                configs.append(
-                    f"{src} ! videoconvert ! videoscale ! {scaled_caps} ! "
-                    f"appsink {sink_props}"
-                )
+        if has_v4l2convert:
+            configs.append(
+                f"{src} ! v4l2convert ! video/x-raw,format=RGB ! appsink {sink_props}"
+            )
 
         if has_glupload and has_glcolorconvert and has_gldownload:
             configs.append(
@@ -348,16 +360,6 @@ class ScreenCapture:
                 f"glupload ! glcolorscale ! gldownload ! "
                 f"video/x-raw,format=RGB ! "
                 f"appsink {sink_props}"
-            )
-
-        if has_v4l2convert:
-            configs.append(
-                f"{src} ! v4l2convert ! video/x-raw,format=RGB ! appsink {sink_props}"
-            )
-
-        if has_videoconvert:
-            configs.append(
-                f"{src} ! videoconvert ! video/x-raw,format=RGB ! appsink {sink_props}"
             )
 
         return configs

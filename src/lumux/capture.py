@@ -1,8 +1,9 @@
 """Screen capture using PipeWire portal with optimized GStreamer pipeline."""
 
+import re
 import time
 import threading
-from typing import Optional, List, TYPE_CHECKING
+from typing import Optional, List, Set, TYPE_CHECKING
 
 import numpy as np
 
@@ -42,6 +43,8 @@ class ScreenCapture:
         self._frame_lock = threading.Lock()
         self._pipeline_running = False
         self._pipeline_error_logged = False
+        self._runtime_failed_configs: Set[str] = set()
+        self._active_config_key: Optional[str] = None
 
         self._source_width: Optional[int] = None
         self._source_height: Optional[int] = None
@@ -75,9 +78,13 @@ class ScreenCapture:
 
     def _stop_gst_pipeline(self) -> None:
         if self._pipeline:
+            bus = self._pipeline.get_bus()
+            if bus:
+                bus.remove_signal_watch()
             self._pipeline.set_state(Gst.State.NULL)
             self._pipeline = None
             self._appsink = None
+        self._active_config_key = None
         self._pipeline_running = False
         self._latest_frame = None
         self._latest_frame_data = None
@@ -362,9 +369,21 @@ class ScreenCapture:
 
         return configs
 
+    @staticmethod
+    def _config_key(pipeline_str: str) -> str:
+        """Identify a pipeline config independent of node id and dimensions,
+        so runtime failures can be remembered across restarts."""
+        key = re.sub(r"path=\d+", "path=*", pipeline_str)
+        key = re.sub(r"width=\d+", "width=*", key)
+        key = re.sub(r"height=\d+", "height=*", key)
+        return key
+
     def _start_pipeline(self) -> bool:
         if not self._portal_node_id:
             return False
+
+        if self._pipeline:
+            self._stop_gst_pipeline()
 
         configs = self._get_pipeline_configs(self._portal_node_id)
         if not configs:
@@ -376,6 +395,9 @@ class ScreenCapture:
         target_w, target_h = self._compute_scaled_dimensions()
 
         for i, pipeline_str in enumerate(configs):
+            config_key = self._config_key(pipeline_str)
+            if config_key in self._runtime_failed_configs:
+                continue
             try:
                 self._pipeline = Gst.parse_launch(pipeline_str)
                 self._appsink = self._pipeline.get_by_name("sink")
@@ -408,6 +430,7 @@ class ScreenCapture:
 
                 self._pipeline_running = True
                 self._pipeline_error_logged = False
+                self._active_config_key = config_key
                 desc = (
                     pipeline_str.split(" ! ")[1] if " ! " in pipeline_str else "unknown"
                 )
@@ -437,7 +460,13 @@ class ScreenCapture:
             print(f"GStreamer pipeline error: {err.message}")
             print(f"GStreamer debug info: {debug}")
             self._pipeline_error_logged = True
-        self._pipeline_running = False
+        if self._active_config_key:
+            self._runtime_failed_configs.add(self._active_config_key)
+            print(
+                "Marking pipeline config as failed; "
+                "will fall back to next converter on restart"
+            )
+        self._stop_gst_pipeline()
 
     def _on_pipeline_warning(self, bus, message):
         warn, debug = message.parse_warning()
@@ -566,6 +595,7 @@ class ScreenCapture:
         self._pipeline_scaled = False
         self._needs_pipeline_restart = False
         self._portal_node_id = None
+        self._runtime_failed_configs.clear()
         print("GStreamer pipeline stopped")
         self._close_portal_session()
 

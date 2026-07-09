@@ -11,7 +11,8 @@ import gi
 
 gi.require_version("Gst", "1.0")
 gi.require_version("GstApp", "1.0")
-from gi.repository import GLib, Gst, GstApp
+gi.require_version("GstVideo", "1.0")
+from gi.repository import GLib, Gst, GstApp, GstVideo
 
 from lumux.black_bar_detector import BlackBarDetector, CropRegion
 
@@ -59,8 +60,11 @@ class ScreenCapture:
 
     def _compute_scaled_dimensions(self):
         if self._source_width and self._source_height and self.scale_factor < 1.0:
-            w = max(1, int(self._source_width * self.scale_factor))
-            h = max(1, int(self._source_height * self.scale_factor))
+            # Round down to a multiple of 4 so RGB row strides stay 4-byte
+            # aligned (avoids padded strides) and odd-width caps that some
+            # converters refuse to link.
+            w = max(4, int(self._source_width * self.scale_factor) & ~3)
+            h = max(4, int(self._source_height * self.scale_factor) & ~3)
             return w, h
         return None, None
 
@@ -498,6 +502,40 @@ class ScreenCapture:
         except Exception as e:
             print(f"Error logging pipeline details: {e}")
 
+    @staticmethod
+    def _extract_pixel_rows(
+        data: bytes, width: int, height: int, bpp: int, stride: Optional[int]
+    ) -> np.ndarray:
+        """Return a (height, width*bpp) uint8 array, stripping row padding.
+
+        GStreamer may pad each row to an alignment boundary (e.g. 4 bytes),
+        so the buffer stride can exceed width*bpp. The real stride comes from
+        GstVideoMeta when available, otherwise it is inferred from the buffer
+        size.
+        """
+        row_bytes = width * bpp
+        if not stride or stride < row_bytes:
+            if len(data) == height * row_bytes:
+                stride = row_bytes
+            else:
+                stride = len(data) // height if height else row_bytes
+        if stride < row_bytes or len(data) < stride * (height - 1) + row_bytes:
+            raise ValueError(
+                f"Buffer too small: {len(data)} bytes for "
+                f"{width}x{height} with bpp={bpp} (stride={stride})"
+            )
+
+        arr = np.frombuffer(data, dtype=np.uint8)
+        if stride == row_bytes:
+            return arr[: height * row_bytes].reshape(height, row_bytes)
+
+        # Padded rows: build a strided view (handles a possibly unpadded
+        # final row) and copy to detach from the mapped buffer.
+        rows = np.lib.stride_tricks.as_strided(
+            arr, shape=(height, row_bytes), strides=(stride, 1)
+        )
+        return rows.copy()
+
     def _on_new_sample(self, appsink) -> Gst.FlowReturn:
         try:
             sample = appsink.emit("pull-sample")
@@ -520,6 +558,14 @@ class ScreenCapture:
                 if self.scale_factor < 1.0:
                     self._needs_pipeline_restart = True
 
+            stride = None
+            try:
+                meta = GstVideo.buffer_get_video_meta(buffer)
+                if meta and meta.n_planes >= 1:
+                    stride = meta.stride[0]
+            except Exception:
+                stride = None
+
             success, map_info = buffer.map(Gst.MapFlags.READ)
             if not success:
                 print(f"Failed to map buffer (format={fmt}, {width}x{height})")
@@ -530,36 +576,32 @@ class ScreenCapture:
             try:
                 data = bytes(map_info.data)
 
-                if fmt == "RGB":
-                    frame = np.frombuffer(data, dtype=np.uint8).reshape(
-                        (height, width, 3)
-                    )
-                elif fmt == "BGR":
-                    frame = (
-                        np.frombuffer(data, dtype=np.uint8)
-                        .reshape((height, width, 3))[:, :, ::-1]
-                        .copy()
-                    )
+                if fmt in ("RGBA", "RGBx", "BGRA", "BGRx"):
+                    bpp = 4
+                elif fmt in ("BGR15", "RGB15"):
+                    bpp = 2
+                else:
+                    bpp = 3
+
+                rows = self._extract_pixel_rows(data, width, height, bpp, stride)
+
+                if fmt == "BGR":
+                    frame = rows.reshape(height, width, 3)[:, :, ::-1].copy()
                 elif fmt in ("RGBA", "RGBx"):
-                    frame = np.frombuffer(data, dtype=np.uint8).reshape(
-                        (height, width, 4)
-                    )
+                    frame = rows.reshape(height, width, 4)
                 elif fmt in ("BGRA", "BGRx"):
-                    frame = (
-                        np.frombuffer(data, dtype=np.uint8)
-                        .reshape((height, width, 4))[:, :, [2, 1, 0, 3]]
-                        .copy()
+                    frame = rows.reshape(height, width, 4)[:, :, [2, 1, 0, 3]].copy()
+                elif fmt in ("BGR15", "RGB15"):
+                    arr = np.ascontiguousarray(rows).view(np.uint16).reshape(
+                        (height, width)
                     )
-                elif fmt == "BGR15" or fmt == "RGB15":
-                    arr = np.frombuffer(data, dtype=np.uint16).reshape((height, width))
                     r = ((arr >> 10) & 0x1F).astype(np.uint8) * 255 // 31
                     g = ((arr >> 5) & 0x1F).astype(np.uint8) * 255 // 31
                     b = (arr & 0x1F).astype(np.uint8) * 255 // 31
                     frame = np.stack([r, g, b], axis=2)
                 else:
-                    frame = np.frombuffer(data, dtype=np.uint8).reshape(
-                        (height, width, 3)
-                    )
+                    # RGB and unknown formats assumed 3 bytes per pixel
+                    frame = rows.reshape(height, width, 3)
 
                 with self._frame_lock:
                     self._latest_frame = frame

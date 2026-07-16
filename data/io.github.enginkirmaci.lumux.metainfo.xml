@@ -77,6 +77,15 @@
   </branding>
 
   <releases>
+    <release version="0.6.2" date="2026-07-16">
+      <description>
+        <p>Bug fixes:</p>
+        <ul>
+          <li>Handle padded row strides and avoid odd scaled widths in capture pipeline</li>
+          <li>Fall back to next converter on runtime pipeline errors for more resilient capture</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.6.0" date="2026-04-23">
       <description>
         <p>Performance and refactoring:</p>

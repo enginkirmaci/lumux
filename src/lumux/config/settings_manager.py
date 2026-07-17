@@ -30,6 +30,7 @@ class HueSettings:
 class CaptureSettings:
     scale_factor: float = 0.125
     source_type: str = "screen"  # "screen" = monitor, "window" = single window
+    restore_token: str = ""  # Portal restore token for persistent screen-cast consent
 
 
 @dataclass

@@ -8,7 +8,8 @@
   },
   "capture": {
     "scale_factor": 0.125,
-    "source_type": "screen"
+    "source_type": "screen",
+    "restore_token": ""
   },
   "zones": {
     "show_preview": true,

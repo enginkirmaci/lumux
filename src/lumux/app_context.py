@@ -33,7 +33,9 @@ class AppContext:
             scale_factor=settings.capture.scale_factor,
             black_bar_settings=settings.black_bar,
             source_type=settings.capture.source_type,
+            restore_token=settings.capture.restore_token,
         )
+        self.capture.set_on_restore_token_changed(self._on_restore_token_changed)
         self.zone_processor = ZoneProcessor(settings=settings.zones)
         self.color_analyzer = ColorAnalyzer(
             brightness_scale=settings.sync.brightness_scale, gamma=settings.sync.gamma
@@ -152,6 +154,24 @@ class AppContext:
 
             if hasattr(self, "mode_manager"):
                 self.mode_manager.reading_settings = self.settings.reading_mode
+
+    def _on_restore_token_changed(self, token: str) -> None:
+        """Persist the portal restore token so screen-share consent survives
+        app restarts. Called by ScreenCapture whenever the portal issues or
+        refreshes a token.
+        """
+        self.settings.capture.restore_token = token
+        try:
+            self.settings.save()
+            if token:
+                print(
+                    f"[settings] Screen-share consent token saved to disk "
+                    f"({len(token)} chars) — will persist across restarts"
+                )
+            else:
+                print("[settings] Screen-share consent token cleared from disk")
+        except Exception as e:
+            timed_print(f"Error persisting capture restore token: {e}")
 
     def get_bridge_status(self, attempt_connect: bool = False) -> BridgeStatus:
         """Return current bridge status, optionally attempting a connection."""

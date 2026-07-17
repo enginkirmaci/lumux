@@ -28,6 +28,7 @@ class ScreenCapture:
         scale_factor: float = 0.125,
         black_bar_settings: Optional["BlackBarSettings"] = None,
         source_type: str = "screen",
+        restore_token: str = "",
     ):
         self.scale_factor = scale_factor
         self.source_type = source_type
@@ -36,6 +37,17 @@ class ScreenCapture:
         self._portal_node_id: Optional[int] = None
         self._portal_session_handle: Optional[str] = None
         self._portal_bus = None
+        # Portal restore token for persistent screen-cast consent. When set,
+        # the portal can skip the permission dialog on subsequent sessions.
+        self._restore_token: str = restore_token or ""
+        self._on_restore_token_changed = None
+        if self._restore_token:
+            print(
+                f"[capture] Loaded cached screen-share consent token "
+                f"({len(self._restore_token)} chars) — should skip prompt"
+            )
+        else:
+            print("[capture] No cached consent token — permission dialog will be shown")
 
         self._pipeline: Optional[Gst.Pipeline] = None
         self._appsink: Optional[GstApp.AppSink] = None
@@ -129,6 +141,18 @@ class ScreenCapture:
         except Exception as e:
             print(f"Error initializing display: {e}")
 
+    @property
+    def restore_token(self) -> str:
+        """Current portal restore token (for diagnostics)."""
+        return self._restore_token
+
+    def set_on_restore_token_changed(self, callback) -> None:
+        """Register a callback invoked when the portal issues/refreshes a
+        restore token. Signature: callback(token: str). Use it to persist the
+        token so subsequent runs can skip the permission dialog.
+        """
+        self._on_restore_token_changed = callback
+
     def capture(self) -> Optional[np.ndarray]:
         if self._needs_pipeline_restart and self._pipeline_running:
             self._restart_pipeline()
@@ -143,7 +167,24 @@ class ScreenCapture:
 
         if not self._portal_node_id:
             if not self._setup_portal_session():
-                return None
+                # A stale restore token (e.g. after a monitor/source change)
+                # can make session setup fail silently. Retry once without it
+                # so the portal shows a fresh permission dialog.
+                if self._restore_token:
+                    print(
+                        "[capture] Cached consent token was rejected by portal "
+                        "(stale or revoked) — clearing cache and re-prompting"
+                    )
+                    self._restore_token = ""
+                    if self._on_restore_token_changed:
+                        try:
+                            self._on_restore_token_changed("")
+                        except Exception as e:
+                            print(f"Error clearing restore token: {e}")
+                    if not self._setup_portal_session():
+                        return None
+                else:
+                    return None
 
         if not self._pipeline_running:
             if not self._start_pipeline():
@@ -209,7 +250,12 @@ class ScreenCapture:
             screencast = portal["org.freedesktop.portal.ScreenCast"]
 
             loop = GLib.MainLoop()
-            state = {"session_handle": None, "node_id": None, "error": None}
+            state = {
+                "session_handle": None,
+                "node_id": None,
+                "restore_token": None,
+                "error": None,
+            }
 
             def on_response(connection, sender, object, interface, signal, params):
                 code, results = params
@@ -223,14 +269,37 @@ class ScreenCapture:
                     loop.quit()
                 elif "streams" in results:
                     state["node_id"] = results["streams"][0][0]
+                    # The Start response may carry a restore_token when
+                    # persistent consent was granted; persist it for next time.
+                    state["restore_token"] = results.get("restore_token", "")
                     loop.quit()
                 else:
                     loop.quit()
 
             token = str(int(time.time()))
-            req = screencast.CreateSession(
-                {"session_handle_token": GLib.Variant("s", "s" + token)}
-            )
+            create_options = {
+                "session_handle_token": GLib.Variant("s", "s" + token),
+                # persist_mode = 2: persist consent until explicitly revoked,
+                # so the portal can issue a restore_token for future sessions.
+                "persist_mode": GLib.Variant("u", 2),
+            }
+            # Only send a restore_token when we actually have one; sending an
+            # empty string can confuse some portal backends.
+            if self._restore_token:
+                create_options["restore_token"] = GLib.Variant(
+                    "s", self._restore_token
+                )
+                print(
+                    "[capture] Restoring cached screen-share consent "
+                    f"(token length {len(self._restore_token)}) — "
+                    "dialog should be skipped"
+                )
+            else:
+                print(
+                    "[capture] Requesting fresh screen-share consent "
+                    "(persist_mode=2) — dialog will be shown once"
+                )
+            req = screencast.CreateSession(create_options)
             sub = bus.con.signal_subscribe(
                 None,
                 "org.freedesktop.portal.Request",
@@ -292,6 +361,28 @@ class ScreenCapture:
             if state["node_id"]:
                 self._portal_node_id = state["node_id"]
                 print(f"Portal session started. PipeWire node: {self._portal_node_id}")
+                # Persist/refresh the restore token if the portal granted one.
+                new_token = state.get("restore_token") or ""
+                if new_token:
+                    print(
+                        f"[capture] Screen-share consent cached "
+                        f"(token length {len(new_token)}) — "
+                        "will skip prompt on next sync"
+                    )
+                else:
+                    print(
+                        "[capture] Portal did NOT issue a consent token — "
+                        "host does not support persisting screen-share consent "
+                        "(needs GNOME 47+ / Plasma 6.x), so the prompt will "
+                        "recur each sync"
+                    )
+                if new_token != self._restore_token:
+                    self._restore_token = new_token
+                    if self._on_restore_token_changed:
+                        try:
+                            self._on_restore_token_changed(new_token)
+                        except Exception as e:
+                            print(f"Error persisting restore token: {e}")
                 return True
 
         except Exception as e:

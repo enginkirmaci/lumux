@@ -502,7 +502,7 @@ class HueBridge:
         """Fetch a specific entertainment configuration by ID."""
         if not self.client:
             return None
-        
+
         try:
             config = self.client.get_entertainment_configuration(config_id)
             if config:
@@ -517,6 +517,62 @@ class HueBridge:
         except BridgeError as e:
             print(f"Error fetching entertainment configuration: {e}")
         return None
+
+    def get_entertainment_light_ids(self, config_id: str) -> List[str]:
+        """Return the light RIDs that belong to an entertainment configuration.
+
+        Entertainment configurations reference fixtures via entertainment
+        service RIDs, which must be resolved to light RIDs through the device
+        list (see _refresh_spatial_data, which does the same for positions).
+        Only these lights are part of the zone; everything else is out of
+        scope for sync/reading mode.
+        """
+        if not self.client or not config_id:
+            return []
+
+        try:
+            config = self.client.get_entertainment_configuration(config_id)
+            if not config:
+                return []
+
+            # Collect every service RID referenced by the config's channels
+            # (and its locations, used by some backends).
+            member_rids: set = set()
+            for channel in config.get('channels', []):
+                for member in channel.get('members', []):
+                    rid = member.get('service', {}).get('rid')
+                    if rid:
+                        member_rids.add(rid)
+            for location in config.get('locations', {}).get('service_locations', []):
+                rid = location.get('service', {}).get('rid')
+                if rid:
+                    member_rids.add(rid)
+
+            if not member_rids:
+                return []
+
+            # Resolve: any device that exposes one of the config's service RIDs
+            # contributes its light service RIDs to the zone.
+            devices = self.client.get_devices()
+            light_ids: List[str] = []
+            seen: set = set()
+            for device in devices:
+                services = device.get('services', [])
+                dev_service_rids = {s.get('rid') for s in services}
+                if not (member_rids & dev_service_rids):
+                    continue
+                for service in services:
+                    if service.get('rtype') != 'light':
+                        continue
+                    lid = service.get('rid')
+                    if lid and lid not in seen:
+                        seen.add(lid)
+                        light_ids.append(lid)
+
+            return light_ids
+        except BridgeError as e:
+            print(f"Error resolving entertainment light IDs: {e}")
+            return []
 
     def activate_entertainment_streaming(self, config_id: str) -> bool:
         """Activate entertainment streaming for a configuration."""

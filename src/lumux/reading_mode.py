@@ -167,32 +167,31 @@ class ReadingModeController:
     
     def _get_target_light_ids(self) -> List[str]:
         """Get list of light IDs to control.
-        
-        Returns explicit targets if set, otherwise tries to discover
-        lights from entertainment configuration.
+
+        Returns explicit targets if set, otherwise discovers
+        lights from the entertainment configuration (the zone).
+        Never falls back to all bridge lights — only zone members
+        are controlled.
         """
         if self._target_light_ids:
             return self._target_light_ids
 
         config_id = self._entertainment_config_id
-        
-        if config_id:
+        if config_id and hasattr(self.bridge, 'get_entertainment_light_ids'):
             try:
-                config = self.bridge.get_entertainment_configuration(config_id)
-                if config and 'channels' in config:
-                    light_ids = []
-                    for channel in config['channels']:
-                        for member in channel.get('members', []):
-                            service = member.get('service', {})
-                            if service.get('rtype') == 'light':
-                                light_ids.append(service['rid'])
-                    if light_ids:
-                        return light_ids
+                light_ids = self.bridge.get_entertainment_light_ids(config_id)
+                if light_ids:
+                    return light_ids
+                timed_print(
+                    "Reading mode: Entertainment zone has no lights configured"
+                )
             except Exception as e:
-                timed_print(f"Reading mode: Failed to get lights from entertainment config: {e}")
-        
-        # Fallback: use all known lights
-        if hasattr(self.bridge, 'get_light_ids'):
-            return self.bridge.get_light_ids()
-        
+                timed_print(
+                    f"Reading mode: Failed to get lights from entertainment config: {e}"
+                )
+
+        timed_print(
+            "Reading mode: No lights found in the entertainment zone; "
+            "not syncing any lights outside the zone"
+        )
         return []

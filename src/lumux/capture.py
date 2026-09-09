@@ -190,14 +190,16 @@ class ScreenCapture:
             if not self._start_pipeline():
                 return None
 
-        timeout = 2.0
+        timeout = 1.0
         start = time.time()
         while (time.time() - start) < timeout:
+            if self._needs_pipeline_restart and self._pipeline_running:
+                self._restart_pipeline()
             with self._frame_lock:
                 frame = self._latest_frame
             if frame is not None:
                 return self._process_image(frame)
-            time.sleep(0.01)
+            time.sleep(0.005)
 
         return None
 
@@ -409,20 +411,29 @@ class ScreenCapture:
         if target_w and target_h:
             scaled_caps = f"video/x-raw,format=RGB,width={target_w},height={target_h}"
 
-            if has_glupload and has_glcolorconvert and has_gldownload:
-                if has_glcolorscale:
-                    configs.append(
-                        f"{src} ! "
-                        f"glupload ! glcolorconvert ! glcolorscale ! "
-                        f"gldownload ! videoscale ! {scaled_caps} ! "
-                        f"appsink {sink_props}"
-                    )
-                if has_videoscale:
-                    configs.append(
-                        f"{src} ! "
-                        f"glupload ! glcolorconvert ! gldownload ! videoscale ! "
-                        f"{scaled_caps} ! appsink {sink_props}"
-                    )
+            # Software convert + scale (most robust in Flatpak sandbox across all GPUs)
+            if has_videoconvert and has_videoscale:
+                configs.append(
+                    f"{src} ! videoconvert ! videoscale ! {scaled_caps} ! "
+                    f"appsink {sink_props}"
+                )
+
+            # GL convert + GL scale + download to system memory via videoconvert
+            if has_glupload and has_glcolorconvert and has_glcolorscale and has_gldownload and has_videoconvert:
+                configs.append(
+                    f"{src} ! "
+                    f"glupload ! glcolorconvert ! glcolorscale ! "
+                    f"gldownload ! videoconvert ! {scaled_caps} ! "
+                    f"appsink {sink_props}"
+                )
+
+            # GL convert + CPU scale + download to system memory via videoconvert
+            if has_glupload and has_glcolorconvert and has_gldownload and has_videoconvert and has_videoscale:
+                configs.append(
+                    f"{src} ! "
+                    f"glupload ! glcolorconvert ! gldownload ! videoconvert ! videoscale ! "
+                    f"{scaled_caps} ! appsink {sink_props}"
+                )
 
             if has_v4l2convert and has_videoscale:
                 configs.append(
@@ -430,24 +441,24 @@ class ScreenCapture:
                     f"appsink {sink_props}"
                 )
 
-            if has_videoconvert and has_videoscale:
-                configs.append(
-                    f"{src} ! videoconvert ! videoscale ! {scaled_caps} ! "
-                    f"appsink {sink_props}"
-                )
+        # Unscaled pipelines
+        if has_videoconvert:
+            configs.append(
+                f"{src} ! videoconvert ! video/x-raw,format=RGB ! appsink {sink_props}"
+            )
 
-        if has_glupload and has_glcolorconvert and has_gldownload:
+        if has_glupload and has_glcolorconvert and has_gldownload and has_videoconvert:
             configs.append(
                 f"{src} ! "
-                f"glupload ! glcolorconvert ! gldownload ! "
+                f"glupload ! glcolorconvert ! gldownload ! videoconvert ! "
                 f"video/x-raw,format=RGB ! "
                 f"appsink {sink_props}"
             )
 
-        if has_glupload and has_glcolorscale and has_gldownload:
+        if has_glupload and has_glcolorscale and has_gldownload and has_videoconvert:
             configs.append(
                 f"{src} ! "
-                f"glupload ! glcolorscale ! gldownload ! "
+                f"glupload ! glcolorscale ! gldownload ! videoconvert ! "
                 f"video/x-raw,format=RGB ! "
                 f"appsink {sink_props}"
             )
@@ -455,11 +466,6 @@ class ScreenCapture:
         if has_v4l2convert:
             configs.append(
                 f"{src} ! v4l2convert ! video/x-raw,format=RGB ! appsink {sink_props}"
-            )
-
-        if has_videoconvert:
-            configs.append(
-                f"{src} ! videoconvert ! video/x-raw,format=RGB ! appsink {sink_props}"
             )
 
         return configs
@@ -659,9 +665,13 @@ class ScreenCapture:
 
             success, map_info = buffer.map(Gst.MapFlags.READ)
             if not success:
-                print(f"Failed to map buffer (format={fmt}, {width}x{height})")
-                print("This likely means DMA-BUF buffers are being received.")
-                print("Ensure GStreamer GL plugins (gst-plugins-gl) are installed.")
+                if not self._pipeline_error_logged:
+                    print(f"Failed to map buffer (format={fmt}, {width}x{height})")
+                    print("This likely means DMA-BUF or GL memory buffers cannot be CPU-mapped.")
+                    self._pipeline_error_logged = True
+                if self._active_config_key:
+                    self._runtime_failed_configs.add(self._active_config_key)
+                self._needs_pipeline_restart = True
                 return Gst.FlowReturn.OK
 
             try:

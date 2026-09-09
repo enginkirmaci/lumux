@@ -91,6 +91,10 @@ class EntertainmentStream:
         self._connected = False
         self._sequence = 0
         self._lock = threading.Lock()
+        self._last_send_time: float = 0.0
+        self._last_colors_xy: Dict[int, Tuple[Tuple[float, float], int]] = {}
+        self._keepalive_running: bool = False
+        self._keepalive_thread: Optional[threading.Thread] = None
 
         # Channel mappings
         self._channels: Dict[int, ChannelInfo] = {}
@@ -137,6 +141,8 @@ class EntertainmentStream:
                 return False
 
             self._connected = True
+            self._last_send_time = time.time()
+            self._start_keepalive()
             timed_print(
                 f"Entertainment stream connected with {len(self._channels)} channels"
             )
@@ -326,12 +332,14 @@ class EntertainmentStream:
     def disconnect(self, bridge: "HueBridge") -> None:
         """Close DTLS connection and deactivate streaming."""
         self._connected = False
+        self._stop_keepalive()
         self._cleanup_openssl()
         self._deactivate_streaming(bridge)
         timed_print("Entertainment stream disconnected")
 
     def _cleanup_openssl(self) -> None:
         """Clean up OpenSSL subprocess."""
+        self._stop_keepalive()
         if not self._openssl_proc:
             return
 
@@ -346,6 +354,45 @@ class EntertainmentStream:
                 pass
         finally:
             self._openssl_proc = None
+
+    def _start_keepalive(self) -> None:
+        """Start background keepalive thread to maintain DTLS session."""
+        self._stop_keepalive()
+        self._keepalive_running = True
+        self._keepalive_thread = threading.Thread(
+            target=self._keepalive_loop, daemon=True, name="HueDTLSKeepalive"
+        )
+        self._keepalive_thread.start()
+
+    def _stop_keepalive(self) -> None:
+        """Stop background keepalive thread."""
+        self._keepalive_running = False
+        self._keepalive_thread = None
+
+    def _keepalive_loop(self) -> None:
+        """Send periodic keepalive packet if no frames were sent recently."""
+        while self._keepalive_running and self.is_connected():
+            time.sleep(1.0)
+            if not self._keepalive_running or not self.is_connected():
+                break
+            if time.time() - self._last_send_time >= 1.5:
+                try:
+                    with self._lock:
+                        if not self.is_connected():
+                            break
+                        if self._last_colors_xy:
+                            message = self._build_xy_message(self._last_colors_xy)
+                        else:
+                            default_colors = {
+                                ch: ((0.3127, 0.3290), 1)
+                                for ch in self._sorted_channel_ids
+                            }
+                            message = self._build_xy_message(default_colors)
+                        self._send_dtls_message(message)
+                        self._sequence = (self._sequence + 1) % 256
+                        self._last_send_time = time.time()
+                except Exception:
+                    break
 
     def is_connected(self) -> bool:
         """Check if DTLS connection is active."""
@@ -368,6 +415,7 @@ class EntertainmentStream:
                 message = self._build_rgb_message(colors)
                 self._send_dtls_message(message)
                 self._sequence = (self._sequence + 1) % 256
+                self._last_send_time = time.time()
             except Exception as e:
                 print(f"Error sending colors: {e}")
                 self._connected = False
@@ -386,9 +434,11 @@ class EntertainmentStream:
 
         with self._lock:
             try:
+                self._last_colors_xy = channel_colors
                 message = self._build_xy_message(channel_colors)
                 self._send_dtls_message(message)
                 self._sequence = (self._sequence + 1) % 256
+                self._last_send_time = time.time()
             except Exception as e:
                 print(f"Error sending colors: {e}")
                 self._connected = False

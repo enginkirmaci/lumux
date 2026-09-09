@@ -309,11 +309,27 @@ class SyncController:
             not self.entertainment_stream
             or not self.entertainment_stream.is_connected()
         ):
-            if self._stats["frame_count"] % 300 == 0:
+            now = time.time()
+            if self.entertainment_stream and (
+                now - getattr(self, "_last_reconnect_attempt", 0) > 2.0
+            ):
+                self._last_reconnect_attempt = now
                 timed_print(
-                    "Warning: Entertainment stream not connected, skipping update"
+                    "Entertainment stream disconnected; attempting automatic reconnection..."
                 )
-            return
+                try:
+                    if self.entertainment_stream.connect(self.bridge):
+                        self._build_zone_channel_mapping()
+                        timed_print(
+                            "Reconnected entertainment stream successfully!"
+                        )
+                    else:
+                        return
+                except Exception as e:
+                    timed_print(f"Reconnection attempt failed: {e}")
+                    return
+            else:
+                return
 
         # Convert zone colors to channel colors
         channel_colors: Dict[int, Tuple[Tuple[float, float], int]] = {}

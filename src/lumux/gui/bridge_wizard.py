@@ -396,7 +396,9 @@ class BridgeWizard(Adw.NavigationPage):
         self.auth_btn.set_sensitive(False)
         self.connect_spinner.set_visible(True)
         self.connect_spinner.start()
-        self.connect_status_row.set_subtitle("Press link button on bridge...")
+        self.connect_status_row.set_subtitle(
+            "Press the link button on the bridge now (waiting up to 90s)..."
+        )
 
         thread = threading.Thread(target=self._authenticate_worker)
         thread.daemon = True
@@ -407,7 +409,7 @@ class BridgeWizard(Adw.NavigationPage):
         try:
             self._temp_bridge = HueBridge(self.bridge_ip, "")
             result = self._temp_bridge.create_user(
-                self.bridge_ip, max_retries=3, timeout=10.0
+                self.bridge_ip, max_retries=45, retry_delay=2.0
             )
             GLib.idle_add(self._on_auth_complete, result)
         except Exception as e:
@@ -435,7 +437,7 @@ class BridgeWizard(Adw.NavigationPage):
                 self.connect_status_row.set_subtitle("Connected!")
         else:
             self.connect_status_row.set_subtitle(
-                "Authentication failed. Press link button and try again."
+                "Timed out waiting for link button press. Try again."
             )
             self.auth_btn.set_sensitive(True)
 

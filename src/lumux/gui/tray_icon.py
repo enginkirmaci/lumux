@@ -294,7 +294,10 @@ class TrayApp:
                 if l := l.strip():
                     try: GLib.idle_add(self.handle, json.loads(l))
                     except: pass
-        except: GLib.idle_add(self.loop.quit)
+        except: pass
+        # stdin EOF: the main app is gone - exit instead of lingering as a
+        # zombie icon for a dead app.
+        GLib.idle_add(self.loop.quit)
 
     def handle(self, cmd):
         if cmd.get("action") == "quit": self.loop.quit()
@@ -364,8 +367,11 @@ class TrayApp:
                 if l := l.strip():
                     try: GLib.idle_add(self.handle, json.loads(l))
                     except: pass
-        except: GLib.idle_add(Gtk.main_quit)
-    
+        except: pass
+        # stdin EOF: the main app is gone - exit instead of lingering as a
+        # zombie icon for a dead app.
+        GLib.idle_add(Gtk.main_quit)
+
     def handle(self, cmd):
         if cmd.get("action") == "quit": Gtk.main_quit()
         elif cmd.get("action") == "update_sync":

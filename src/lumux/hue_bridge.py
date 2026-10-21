@@ -10,7 +10,7 @@ import urllib.error
 import urllib.request
 from typing import Dict, List, Optional
 
-from lumux.bridge_client import BridgeClient, BridgeError
+from lumux.bridge_client import BridgeClient, BridgeConnectionError, BridgeError
 from lumux.utils.logging import timed_print
 
 
@@ -57,31 +57,41 @@ class HueBridge:
             return False
 
     def create_user(self, bridge_ip: str, application_name: str = "lumux",
-                   max_retries: int = 3, timeout: float = 10.0) -> Optional[dict]:
+                   max_retries: int = 45, retry_delay: float = 2.0) -> Optional[dict]:
         """Create a new user/app key on the bridge.
 
-        User must press the link button on the bridge before calling this.
-        Retries with exponential backoff if the link button hasn't been pressed yet.
+        The bridge rejects this call with a "link button not pressed" error
+        until the physical link button has been pressed, so this polls the
+        bridge every `retry_delay` seconds (default: 90s total) giving the
+        user time to walk over and press it before giving up. Gives up
+        immediately if the bridge cannot be reached.
 
         Args:
             bridge_ip: IP address of the Hue bridge
             application_name: Name of the application to register
-            max_retries: Maximum number of attempts
-            timeout: Request timeout in seconds
+            max_retries: Maximum number of polling attempts
+            retry_delay: Seconds to wait between attempts
 
         Returns:
             Dict with 'app_key' and 'client_key' on success, None on failure.
         """
-        try:
-            result = BridgeClient.create_user(bridge_ip, application_name)
-            if result:
-                self.app_key = result['app_key']
-                self.bridge_ip = bridge_ip
-                self._client = None  # Reset client with new credentials
-            return result
-        except BridgeError as e:
-            print(f"Error creating user: {e}")
-            return None
+        for attempt in range(1, max_retries + 1):
+            try:
+                result = BridgeClient.create_user(bridge_ip, application_name)
+                if result:
+                    self.app_key = result['app_key']
+                    self.bridge_ip = bridge_ip
+                    self._client = None  # Reset client with new credentials
+                    return result
+            except BridgeConnectionError as e:
+                # Wrong IP or bridge offline: waiting longer won't help
+                print(f"Error creating user: {e}")
+                return None
+            except BridgeError as e:
+                print(f"Waiting for link button press (attempt {attempt}/{max_retries}): {e}")
+            if attempt < max_retries:
+                time.sleep(retry_delay)
+        return None
 
     def refresh_devices(self):
         """Fetch all lights, zones, and entertainment configs from bridge."""

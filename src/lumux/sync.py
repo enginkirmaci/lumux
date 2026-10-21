@@ -13,6 +13,9 @@ from lumux.colors import ColorAnalyzer
 from lumux.entertainment import EntertainmentStream
 from lumux.config.zone_mapping import ZoneMapping
 
+# Minimum seconds between attempts to re-establish a dropped DTLS session
+RECONNECT_INTERVAL = 5.0
+
 
 class SyncController:
     def __init__(
@@ -41,6 +44,9 @@ class SyncController:
 
         # Zone to channel mapping for entertainment streaming
         self._zone_channel_map: Dict[str, int] = {}
+
+        self._reconnecting = False
+        self._last_reconnect_attempt = 0.0
 
         self._stats = {
             "fps": 0,
@@ -309,10 +315,7 @@ class SyncController:
             not self.entertainment_stream
             or not self.entertainment_stream.is_connected()
         ):
-            if self._stats["frame_count"] % 300 == 0:
-                timed_print(
-                    "Warning: Entertainment stream not connected, skipping update"
-                )
+            self._schedule_reconnect()
             return
 
         # Convert zone colors to channel colors
@@ -338,6 +341,37 @@ class SyncController:
         # Send to all channels via DTLS
         if channel_colors:
             self.entertainment_stream.send_colors_xy(channel_colors)
+
+    def _schedule_reconnect(self):
+        """Recover a dropped DTLS session without blocking the sync loop."""
+        now = time.monotonic()
+        if (
+            not self.entertainment_stream
+            or self._reconnecting
+            or now - self._last_reconnect_attempt < RECONNECT_INTERVAL
+        ):
+            return
+
+        self._reconnecting = True
+        self._last_reconnect_attempt = now
+        timed_print("Entertainment stream disconnected; attempting to reconnect")
+        threading.Thread(
+            target=self._reconnect, daemon=True, name="EntertainmentReconnect"
+        ).start()
+
+    def _reconnect(self):
+        try:
+            if self.entertainment_stream.reconnect(self.bridge):
+                if not self.running:
+                    # Sync was stopped meanwhile: leave no session behind
+                    self.entertainment_stream.disconnect(self.bridge)
+                    return
+                self._build_zone_channel_mapping()
+                timed_print("Entertainment stream reconnected")
+        except Exception as e:
+            timed_print(f"Reconnection failed: {e}")
+        finally:
+            self._reconnecting = False
 
     def _queue_status(self, status_type: str, message, data=None):
         """Queue status update for GUI thread."""

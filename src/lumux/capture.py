@@ -1,5 +1,6 @@
 """Screen capture using PipeWire portal with optimized GStreamer pipeline."""
 
+import os
 import re
 import time
 import threading
@@ -21,8 +22,22 @@ if TYPE_CHECKING:
 
 Gst.init(None)
 
+# Broken GL readback (e.g. Mesa/RADV) makes these categories log one error per
+# frame until the capture falls back to the next converter. Leave the output
+# alone when the user asked for specific debug output.
+if not os.environ.get("GST_DEBUG"):
+    for _category in ("glbasetexture", "videometa"):
+        Gst.debug_set_threshold_for_name(_category, Gst.DebugLevel.NONE)
+
 
 class ScreenCapture:
+    # Unmappable buffers within _MAP_FAILURE_WINDOW seconds after which the
+    # active pipeline config is considered broken and the next converter is
+    # tried. Failures are not required to be consecutive: broken GL readback
+    # often lets the occasional (blank) frame through between the dropped ones.
+    _MAP_FAILURE_LIMIT = 5
+    _MAP_FAILURE_WINDOW = 2.0
+
     def __init__(
         self,
         scale_factor: float = 0.125,
@@ -58,6 +73,7 @@ class ScreenCapture:
         self._pipeline_error_logged = False
         self._runtime_failed_configs: Set[str] = set()
         self._active_config_key: Optional[str] = None
+        self._map_failure_times: List[float] = []
 
         self._source_width: Optional[int] = None
         self._source_height: Optional[int] = None
@@ -282,6 +298,7 @@ class ScreenCapture:
                 # persist_mode = 2: persist consent until explicitly revoked,
                 # so the portal can issue a restore_token for future sessions.
                 "persist_mode": GLib.Variant("u", 2),
+                "handle_token": GLib.Variant("s", f"lx{time.time_ns()}a"),
             }
             # Only send a restore_token when we actually have one; sending an
             # empty string can confuse some portal backends.
@@ -326,6 +343,7 @@ class ScreenCapture:
                 {
                     "types": GLib.Variant("u", portal_types),
                     "multiple": GLib.Variant("b", False),
+                    "handle_token": GLib.Variant("s", f"lx{time.time_ns()}b"),
                 },
             )
             sub = bus.con.signal_subscribe(
@@ -343,7 +361,11 @@ class ScreenCapture:
                 bus.con.signal_unsubscribe(sub)
 
             loop = GLib.MainLoop()
-            req = screencast.Start(self._portal_session_handle, "", {})
+            req = screencast.Start(
+                self._portal_session_handle,
+                "",
+                {"handle_token": GLib.Variant("s", f"lx{time.time_ns()}c")},
+            )
             sub = bus.con.signal_subscribe(
                 None,
                 "org.freedesktop.portal.Request",
@@ -398,7 +420,6 @@ class ScreenCapture:
         has_glupload = Gst.ElementFactory.find("glupload") is not None
         has_glcolorconvert = Gst.ElementFactory.find("glcolorconvert") is not None
         has_gldownload = Gst.ElementFactory.find("gldownload") is not None
-        has_glcolorscale = Gst.ElementFactory.find("glcolorscale") is not None
         has_videoscale = Gst.ElementFactory.find("videoscale") is not None
         has_v4l2convert = Gst.ElementFactory.find("v4l2convert") is not None
         has_videoconvert = Gst.ElementFactory.find("videoconvert") is not None
@@ -410,13 +431,6 @@ class ScreenCapture:
             scaled_caps = f"video/x-raw,format=RGB,width={target_w},height={target_h}"
 
             if has_glupload and has_glcolorconvert and has_gldownload:
-                if has_glcolorscale:
-                    configs.append(
-                        f"{src} ! "
-                        f"glupload ! glcolorconvert ! glcolorscale ! "
-                        f"gldownload ! videoscale ! {scaled_caps} ! "
-                        f"appsink {sink_props}"
-                    )
                 if has_videoscale:
                     configs.append(
                         f"{src} ! "
@@ -440,14 +454,6 @@ class ScreenCapture:
             configs.append(
                 f"{src} ! "
                 f"glupload ! glcolorconvert ! gldownload ! "
-                f"video/x-raw,format=RGB ! "
-                f"appsink {sink_props}"
-            )
-
-        if has_glupload and has_glcolorscale and has_gldownload:
-            configs.append(
-                f"{src} ! "
-                f"glupload ! glcolorscale ! gldownload ! "
                 f"video/x-raw,format=RGB ! "
                 f"appsink {sink_props}"
             )
@@ -525,6 +531,7 @@ class ScreenCapture:
 
                 self._pipeline_running = True
                 self._pipeline_error_logged = False
+                self._map_failure_times.clear()
                 self._active_config_key = config_key
                 desc = (
                     pipeline_str.split(" ! ")[1] if " ! " in pipeline_str else "unknown"
@@ -563,9 +570,50 @@ class ScreenCapture:
             )
         self._stop_gst_pipeline()
 
+    def _on_unmappable_buffer(self, detail: str) -> None:
+        """Called for every frame whose buffer cannot be mapped to system memory.
+
+        Some GL/driver combinations (e.g. Mesa/RADV, where gldownload can only
+        read back RGBA textures) negotiate fine but never deliver CPU-readable
+        frames, so the pipeline never errors out. After a few failures in a
+        short window, mark the active config as failed and restart with the next
+        converter instead of dropping every frame forever.
+        """
+        now = time.monotonic()
+        self._map_failure_times.append(now)
+        self._map_failure_times = [
+            t for t in self._map_failure_times if now - t <= self._MAP_FAILURE_WINDOW
+        ]
+        if len(self._map_failure_times) < self._MAP_FAILURE_LIMIT:
+            return
+        if self._needs_pipeline_restart:
+            return
+
+        key = self._active_config_key
+        print(
+            f"Failed to map {len(self._map_failure_times)} buffers in "
+            f"{self._MAP_FAILURE_WINDOW:g}s ({detail}); trying next pipeline config"
+        )
+        if key:
+            self._runtime_failed_configs.add(key)
+            # All GL variants read back through the same gldownload path, so
+            # they share the failure; skip them rather than retrying each one.
+            if "glupload" in key and self._portal_node_id:
+                for config in self._get_pipeline_configs(self._portal_node_id):
+                    if "glupload" in config:
+                        self._runtime_failed_configs.add(self._config_key(config))
+        self._map_failure_times.clear()
+        self._needs_pipeline_restart = True
+
     def _on_pipeline_warning(self, bus, message):
         warn, debug = message.parse_warning()
-        print(f"GStreamer pipeline warning: {warn.message}")
+        if debug and "invalid video buffer received" in debug:
+            # An element downstream of gldownload (e.g. videoscale) could not
+            # map the frame and dropped it, so it never reaches the appsink and
+            # _on_new_sample cannot detect it. Same root cause, same fallback.
+            self._on_unmappable_buffer("dropped by a downstream element")
+            return
+        print(f"GStreamer pipeline warning: {warn.message} ({debug})")
 
     def _on_pipeline_element_message(self, bus, message):
         structure = message.get_structure()
@@ -659,9 +707,7 @@ class ScreenCapture:
 
             success, map_info = buffer.map(Gst.MapFlags.READ)
             if not success:
-                print(f"Failed to map buffer (format={fmt}, {width}x{height})")
-                print("This likely means DMA-BUF buffers are being received.")
-                print("Ensure GStreamer GL plugins (gst-plugins-gl) are installed.")
+                self._on_unmappable_buffer(f"format={fmt}, {width}x{height}")
                 return Gst.FlowReturn.OK
 
             try:

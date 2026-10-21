@@ -17,6 +17,9 @@ from lumux.utils.logging import timed_print
 if TYPE_CHECKING:
     from lumux.hue_bridge import HueBridge
 
+# Seconds without packets after which an idle session gets a keepalive frame
+KEEPALIVE_INTERVAL = 1.5
+
 
 # HueStream protocol constants
 class HueStreamProtocol:
@@ -92,6 +95,11 @@ class EntertainmentStream:
         self._sequence = 0
         self._lock = threading.Lock()
 
+        # Keepalive: the bridge drops the DTLS session after a few seconds
+        # without packets (e.g. while the screen-share portal dialog is open)
+        self._last_send_time: float = 0.0
+        self._keepalive_stop: Optional[threading.Event] = None
+
         # Channel mappings
         self._channels: Dict[int, ChannelInfo] = {}
         self._light_to_channel: Dict[str, int] = {}
@@ -137,6 +145,8 @@ class EntertainmentStream:
                 return False
 
             self._connected = True
+            self._last_send_time = time.monotonic()
+            self._start_keepalive()
             timed_print(
                 f"Entertainment stream connected with {len(self._channels)} channels"
             )
@@ -218,6 +228,13 @@ class EntertainmentStream:
         buf[13] = 0x00
         buf[15] = 0x00
         buf[16:52] = self._encoded_config_id
+        # Address every channel so the black keepalive frame sent before the
+        # first captured frame reaches all lights, not just channel 0
+        for i, channel_id in enumerate(self._sorted_channel_ids):
+            buf[
+                HueStreamProtocol.MESSAGE_HEADER_SIZE
+                + i * HueStreamProtocol.CHANNEL_DATA_SIZE
+            ] = channel_id
 
     def _parse_single_channel(self, channel: dict) -> None:
         """Parse a single channel from config."""
@@ -326,9 +343,54 @@ class EntertainmentStream:
     def disconnect(self, bridge: "HueBridge") -> None:
         """Close DTLS connection and deactivate streaming."""
         self._connected = False
+        self._stop_keepalive()
         self._cleanup_openssl()
         self._deactivate_streaming(bridge)
         timed_print("Entertainment stream disconnected")
+
+    def reconnect(self, bridge: "HueBridge") -> bool:
+        """Re-establish a dropped DTLS session."""
+        self._connected = False
+        self._stop_keepalive()
+        self._cleanup_openssl()
+        return self.connect(bridge)
+
+    def _start_keepalive(self) -> None:
+        """Start the thread that keeps the DTLS session alive while idle."""
+        self._stop_keepalive()
+        stop = threading.Event()
+        self._keepalive_stop = stop
+        threading.Thread(
+            target=self._keepalive_loop,
+            args=(stop,),
+            daemon=True,
+            name="HueDTLSKeepalive",
+        ).start()
+
+    def _stop_keepalive(self) -> None:
+        if self._keepalive_stop:
+            self._keepalive_stop.set()
+            self._keepalive_stop = None
+
+    def _keepalive_loop(self, stop: threading.Event) -> None:
+        """Re-send the last frame when no colors were sent recently."""
+        while not stop.wait(0.5):
+            with self._lock:
+                if stop.is_set() or not self.is_connected():
+                    return
+                if time.monotonic() - self._last_send_time < KEEPALIVE_INTERVAL:
+                    continue
+                try:
+                    # The buffer still holds the last frame (black before the
+                    # first one); only the sequence number needs refreshing
+                    self._message_buffer[11] = self._sequence
+                    self._send_dtls_message(bytes(self._message_buffer))
+                    self._sequence = (self._sequence + 1) % 256
+                    self._last_send_time = time.monotonic()
+                except Exception as e:
+                    print(f"Keepalive failed: {e}")
+                    self._connected = False
+                    return
 
     def _cleanup_openssl(self) -> None:
         """Clean up OpenSSL subprocess."""
@@ -368,6 +430,7 @@ class EntertainmentStream:
                 message = self._build_rgb_message(colors)
                 self._send_dtls_message(message)
                 self._sequence = (self._sequence + 1) % 256
+                self._last_send_time = time.monotonic()
             except Exception as e:
                 print(f"Error sending colors: {e}")
                 self._connected = False
@@ -389,6 +452,7 @@ class EntertainmentStream:
                 message = self._build_xy_message(channel_colors)
                 self._send_dtls_message(message)
                 self._sequence = (self._sequence + 1) % 256
+                self._last_send_time = time.monotonic()
             except Exception as e:
                 print(f"Error sending colors: {e}")
                 self._connected = False

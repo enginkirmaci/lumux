@@ -22,6 +22,10 @@ finish-args:
   - --talk-name=org.freedesktop.StatusNotifierWatcher
   - --talk-name=org.freedesktop.Notifications
 
+  # Diagnostics: stdout is a pipe under gnome-session/journald, so without
+  # this Python block-buffers and log lines are lost on a crash
+  - --env=PYTHONUNBUFFERED=1
+
 cleanup:
   - /include
   - /lib/pkgconfig

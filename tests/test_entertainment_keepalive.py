@@ -56,7 +56,12 @@ def test_keepalive_sends_black_before_first_frame():
     header = entertainment.HueStreamProtocol.MESSAGE_HEADER_SIZE
     messages = sent_messages(stream)
     assert messages
-    assert all(not any(m[header:][1:7]) for m in messages)  # channel 0 color bytes
+    size = entertainment.HueStreamProtocol.CHANNEL_DATA_SIZE
+    for m in messages:
+        slots = [m[header + i * size:header + (i + 1) * size] for i in range(2)]
+        # Every channel is addressed and black, not just channel 0
+        assert [slot[0] for slot in slots] == [0, 1]
+        assert not any(b for slot in slots for b in slot[1:])
 
 
 def test_keepalive_stops_with_stream():

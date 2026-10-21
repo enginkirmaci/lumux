@@ -228,6 +228,13 @@ class EntertainmentStream:
         buf[13] = 0x00
         buf[15] = 0x00
         buf[16:52] = self._encoded_config_id
+        # Address every channel so the black keepalive frame sent before the
+        # first captured frame reaches all lights, not just channel 0
+        for i, channel_id in enumerate(self._sorted_channel_ids):
+            buf[
+                HueStreamProtocol.MESSAGE_HEADER_SIZE
+                + i * HueStreamProtocol.CHANNEL_DATA_SIZE
+            ] = channel_id
 
     def _parse_single_channel(self, channel: dict) -> None:
         """Parse a single channel from config."""

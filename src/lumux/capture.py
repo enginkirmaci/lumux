@@ -63,6 +63,7 @@ class ScreenCapture:
         self._source_height: Optional[int] = None
         self._pipeline_scaled = False
         self._needs_pipeline_restart = False
+        self._source_lost = False
 
         self._black_bar_detector: Optional[BlackBarDetector] = None
         if black_bar_settings is not None:
@@ -154,6 +155,12 @@ class ScreenCapture:
         self._on_restore_token_changed = callback
 
     def capture(self) -> Optional[np.ndarray]:
+        if self._source_lost:
+            # PipeWire node vanished (e.g. screen sleep): rebuild the portal
+            # session on this thread
+            self._source_lost = False
+            self.stop_pipeline()
+
         if self._needs_pipeline_restart and self._pipeline_running:
             self._restart_pipeline()
             if not self._pipeline_running:
@@ -555,7 +562,10 @@ class ScreenCapture:
             print(f"GStreamer pipeline error: {err.message}")
             print(f"GStreamer debug info: {debug}")
             self._pipeline_error_logged = True
-        if self._active_config_key:
+        if message.src is not None and message.src.get_name().startswith("pipewiresrc"):
+            # Source error (node gone), not converter fault: node id stale
+            self._source_lost = True
+        elif self._active_config_key:
             self._runtime_failed_configs.add(self._active_config_key)
             print(
                 "Marking pipeline config as failed; "

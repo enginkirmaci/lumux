@@ -153,6 +153,18 @@ class ScreenCapture:
         """
         self._on_restore_token_changed = callback
 
+    def reset_source(self) -> None:
+        """Forget the cached consent and drop the session, so the next capture
+        shows the portal's source picker again.
+        """
+        self._restore_token = ""
+        if self._on_restore_token_changed:
+            try:
+                self._on_restore_token_changed("")
+            except Exception as e:
+                print(f"Error clearing restore token: {e}")
+        self.stop_pipeline()
+
     def capture(self) -> Optional[np.ndarray]:
         if self._needs_pipeline_restart and self._pipeline_running:
             self._restart_pipeline()

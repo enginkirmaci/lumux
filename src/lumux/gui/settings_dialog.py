@@ -183,6 +183,16 @@ class SettingsDialog(Adw.PreferencesDialog):
         )
         capture_group.add(self.capture_source_row)
 
+        # Forget the remembered screen/window so the portal asks again
+        reselect_row = Adw.ActionRow()
+        reselect_row.set_title("Re-select Source")
+        reselect_row.set_subtitle("Choose a different screen or window on next sync")
+        reselect_btn = Gtk.Button(label="Reset")
+        reselect_btn.set_valign(Gtk.Align.CENTER)
+        reselect_btn.connect("clicked", self._on_reselect_source_clicked)
+        reselect_row.add_suffix(reselect_btn)
+        capture_group.add(reselect_row)
+
         # Resolution scale
         self.scale_row = Adw.SpinRow.new_with_range(0.01, 1.0, 0.01)
         self.scale_row.set_title("Resolution Scale")
@@ -391,6 +401,10 @@ class SettingsDialog(Adw.PreferencesDialog):
     def _on_wizard_close(self, wizard):
         """Close the wizard and return to settings."""
         self.pop_subpage()
+
+    def _on_reselect_source_clicked(self, _button):
+        """Clear the saved capture consent; the portal picker shows again."""
+        self.app_context.capture.reset_source()
 
     def _on_wizard_finished(
         self,

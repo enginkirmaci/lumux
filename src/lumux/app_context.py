@@ -124,7 +124,10 @@ class AppContext:
 
             capture = self.settings.capture
             self.capture.update_scale_factor(capture.scale_factor)
-            self.capture.source_type = capture.source_type
+            if self.capture.source_type != capture.source_type:
+                self.capture.source_type = capture.source_type
+                # Old token would restore the previous screen/window choice.
+                self.capture.reset_source()
 
             self.capture.update_black_bar_settings(self.settings.black_bar)
 

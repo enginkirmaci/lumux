@@ -153,6 +153,18 @@ class ScreenCapture:
         """
         self._on_restore_token_changed = callback
 
+    def reset_source(self) -> None:
+        """Forget the cached consent and drop the session, so the next capture
+        shows the portal's source picker again.
+        """
+        self._restore_token = ""
+        if self._on_restore_token_changed:
+            try:
+                self._on_restore_token_changed("")
+            except Exception as e:
+                print(f"Error clearing restore token: {e}")
+        self.stop_pipeline()
+
     def capture(self) -> Optional[np.ndarray]:
         if self._needs_pipeline_restart and self._pipeline_running:
             self._restart_pipeline()
@@ -277,16 +289,18 @@ class ScreenCapture:
                     loop.quit()
 
             token = str(int(time.time()))
-            create_options = {
-                "session_handle_token": GLib.Variant("s", "s" + token),
-                # persist_mode = 2: persist consent until explicitly revoked,
-                # so the portal can issue a restore_token for future sessions.
+            create_options = {"session_handle_token": GLib.Variant("s", "s" + token)}
+            # persist_mode / restore_token are SelectSources options, not
+            # CreateSession ones; the portal silently ignores them here.
+            select_options = {
+                "types": GLib.Variant("u", 1 if self.source_type == "screen" else 2),
+                "multiple": GLib.Variant("b", False),
+                # 2 = persist until revoked, so Start returns a restore_token.
                 "persist_mode": GLib.Variant("u", 2),
             }
-            # Only send a restore_token when we actually have one; sending an
-            # empty string can confuse some portal backends.
+            # Only send a restore_token when we have one; empty confuses backends.
             if self._restore_token:
-                create_options["restore_token"] = GLib.Variant(
+                select_options["restore_token"] = GLib.Variant(
                     "s", self._restore_token
                 )
                 print(
@@ -319,14 +333,9 @@ class ScreenCapture:
                 return False
             self._portal_session_handle = state["session_handle"]
 
-            portal_types = 1 if self.source_type == "screen" else 2
             loop = GLib.MainLoop()
             req = screencast.SelectSources(
-                self._portal_session_handle,
-                {
-                    "types": GLib.Variant("u", portal_types),
-                    "multiple": GLib.Variant("b", False),
-                },
+                self._portal_session_handle, select_options
             )
             sub = bus.con.signal_subscribe(
                 None,
@@ -373,7 +382,7 @@ class ScreenCapture:
                     print(
                         "[capture] Portal did NOT issue a consent token — "
                         "host does not support persisting screen-share consent "
-                        "(needs GNOME 47+ / Plasma 6.x), so the prompt will "
+                        "(needs xdg-desktop-portal 1.16+ and a backend that supports it), so the prompt will "
                         "recur each sync"
                     )
                 if new_token != self._restore_token:
